@@ -39,7 +39,13 @@ export interface ProductData {
 
 export class ContentAnalyzer {
   static async analyzeContent(scrapedData: any): Promise<ProductData> {
-    const { markdown, metadata } = scrapedData;
+    // Handle undefined or null scrapedData
+    if (!scrapedData || typeof scrapedData !== 'object') {
+      console.warn('Invalid scraped data provided, using fallback analysis');
+      return this.fallbackAnalysis('', { title: 'Unknown' });
+    }
+
+    const { markdown = '', metadata = {} } = scrapedData;
     
     const analysisPrompt = `
       EXTRACT LANDING PAGE DATA from this content for Alex Hormozi's Value Equation:
