@@ -12,7 +12,9 @@ const Index = () => {
   const [selectedPageType, setSelectedPageType] = useState<string>('');
 
   const handleURLProcessed = (data: any) => {
+    console.log('handleURLProcessed called with data:', data);
     setProductData(data);
+    console.log('Setting currentStep to data-review');
     setCurrentStep('data-review');
   };
 

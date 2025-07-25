@@ -153,6 +153,7 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
       });
 
       setTimeout(() => {
+        console.log('About to call onProcessingComplete with data:', productData);
         onProcessingComplete(productData);
         toast({
           title: "Analysis Complete",
