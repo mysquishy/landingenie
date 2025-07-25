@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, AlertCircle, Loader2, Globe, Key } from 'lucide-react';
 import { FirecrawlService } from '@/utils/FirecrawlService';
 import { PerplexityService } from '@/utils/PerplexityService';
+import { ApifyService } from '@/utils/ApifyService';
+import { IntelligentScraper } from '@/utils/IntelligentScraper';
 import { ContentAnalyzer, type ProductData } from '@/utils/ContentAnalyzer';
 
 interface URLValidation {
@@ -24,6 +26,8 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
   const [url, setUrl] = useState('');
   const [firecrawlApiKey, setFirecrawlApiKey] = useState(FirecrawlService.getApiKey() || '');
   const [perplexityApiKey, setPerplexityApiKey] = useState(PerplexityService.getApiKey() || '');
+  const [apifyToken, setApifyToken] = useState(ApifyService.getApiToken() || '');
+  const [preferredService, setPreferredService] = useState<'auto' | 'firecrawl' | 'apify'>('auto');
   const [isProcessing, setIsProcessing] = useState(false);
   const [validation, setValidation] = useState<URLValidation | null>(null);
   const [progress, setProgress] = useState(0);
@@ -45,6 +49,9 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
     if (firecrawlApiKey.trim() && perplexityApiKey.trim()) {
       FirecrawlService.saveApiKey(firecrawlApiKey.trim());
       PerplexityService.saveApiKey(perplexityApiKey.trim());
+      if (apifyToken.trim()) {
+        ApifyService.saveApiToken(apifyToken.trim());
+      }
       setShowApiKeyInput(false);
       toast({
         title: "API Keys Saved",
@@ -87,9 +94,17 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
         return;
       }
 
-      // Step 2: Scrape content
-      setProgress(30);
-      const scrapeResult = await FirecrawlService.scrapeWebsite(url);
+      // Step 2: Intelligent scraping with auto-fallback
+      setProgress(20);
+      const analysis = IntelligentScraper.analyzeURL(url);
+      setValidation({
+        isValid: true,
+        isAccessible: true,
+        redirectedURL: `Using ${analysis.recommendedService} - ${analysis.reasoning}`
+      });
+      
+      setProgress(40);
+      const scrapeResult = await IntelligentScraper.scrapeURL(url, preferredService);
       
       if (!scrapeResult.success) {
         setValidation({
@@ -101,23 +116,31 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
         return;
       }
 
-      // Step 3: Analyze content
-      setProgress(60);
+      // Step 3: Analyze content with AI
+      setProgress(70);
       const productData: ProductData = await ContentAnalyzer.analyzeContent(scrapeResult.data);
+      
+      // Add scraping metadata
+      (productData as any).scrapingMetadata = {
+        method: scrapeResult.method,
+        qualityScore: scrapeResult.qualityScore,
+        processingTime: scrapeResult.processingTime,
+        cost: scrapeResult.cost
+      };
 
       // Step 4: Complete
       setProgress(100);
       setValidation({
         isValid: true,
         isAccessible: true,
-        redirectedURL: url
+        redirectedURL: `✅ Extracted using ${scrapeResult.method} (${Math.round((scrapeResult.qualityScore || 0) * 100)}% quality)`
       });
 
       setTimeout(() => {
         onProcessingComplete(productData);
         toast({
           title: "Analysis Complete",
-          description: "Affiliate URL analyzed successfully",
+          description: `Extracted using ${scrapeResult.method} with ${Math.round((scrapeResult.qualityScore || 0) * 100)}% quality score`,
         });
       }, 500);
 
@@ -189,6 +212,45 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
                   <a href="https://perplexity.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     perplexity.ai
                   </a>
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="apifyToken" className="text-sm font-medium flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  Apify Token (Optional)
+                </label>
+                <Input
+                  id="apifyToken"
+                  type="password"
+                  value={apifyToken}
+                  onChange={(e) => setApifyToken(e.target.value)}
+                  placeholder="Enter your Apify token"
+                />
+                <p className="text-xs text-muted-foreground">
+                  For complex JavaScript sites. Get token from{' '}
+                  <a href="https://apify.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    apify.com
+                  </a>
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="preferredService" className="text-sm font-medium">
+                  Preferred Service
+                </label>
+                <select
+                  id="preferredService"
+                  value={preferredService}
+                  onChange={(e) => setPreferredService(e.target.value as 'auto' | 'firecrawl' | 'apify')}
+                  className="w-full p-2 border border-input rounded-md bg-background text-foreground"
+                >
+                  <option value="auto">Auto-select best service</option>
+                  <option value="firecrawl">Always use Firecrawl</option>
+                  <option value="apify">Always use Apify (requires token)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Auto-selection uses Firecrawl for most sites, Apify for complex platforms
                 </p>
               </div>
               
