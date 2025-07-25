@@ -4,7 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, AlertCircle, Loader2, Globe } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Globe, Key } from 'lucide-react';
+import { FirecrawlService } from '@/utils/FirecrawlService';
+import { ContentAnalyzer, type ProductData } from '@/utils/ContentAnalyzer';
 
 interface URLValidation {
   isValid: boolean;
@@ -19,9 +21,11 @@ interface URLProcessorProps {
 
 export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
   const [url, setUrl] = useState('');
+  const [apiKey, setApiKey] = useState(FirecrawlService.getApiKey() || '');
   const [isProcessing, setIsProcessing] = useState(false);
   const [validation, setValidation] = useState<URLValidation | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(!FirecrawlService.getApiKey());
   const { toast } = useToast();
 
   const validateURL = (url: string): boolean => {
@@ -33,67 +37,92 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
     }
   };
 
-  const simulateProcessing = async () => {
-    setIsProcessing(true);
-    setProgress(0);
-
-    // Simulate validation
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setProgress(25);
-
-    if (!validateURL(url)) {
-      setValidation({
-        isValid: false,
-        isAccessible: false,
-        errorMessage: 'Invalid URL format'
+  const saveApiKey = () => {
+    if (apiKey.trim()) {
+      FirecrawlService.saveApiKey(apiKey.trim());
+      setShowApiKeyInput(false);
+      toast({
+        title: "API Key Saved",
+        description: "You can now analyze affiliate URLs",
       });
-      setIsProcessing(false);
+    }
+  };
+
+  const processURL = async () => {
+    if (!FirecrawlService.getApiKey()) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Firecrawl API key first",
+        variant: "destructive"
+      });
+      setShowApiKeyInput(true);
       return;
     }
 
-    // Simulate scraping
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setProgress(50);
+    setIsProcessing(true);
+    setProgress(0);
+    setValidation(null);
 
-    // Simulate analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setProgress(75);
-
-    // Simulate completion
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setProgress(100);
-
-    setValidation({
-      isValid: true,
-      isAccessible: true,
-      redirectedURL: url
-    });
-
-    const mockData = {
-      productInfo: {
-        name: "Premium Marketing Course",
-        category: "education",
-        industry: "Digital Marketing",
-        pricePoint: "high"
-      },
-      dreamOutcome: {
-        mainBenefit: "10x Your Marketing ROI in 90 Days",
-        targetAudience: "Small business owners and marketers",
-        emotionalOutcome: "Financial freedom and business growth"
-      },
-      extractionQuality: {
-        completenessScore: 0.85,
-        confidenceLevel: "high"
+    try {
+      // Step 1: Validate URL
+      setProgress(10);
+      if (!validateURL(url)) {
+        setValidation({
+          isValid: false,
+          isAccessible: false,
+          errorMessage: 'Invalid URL format'
+        });
+        setIsProcessing(false);
+        return;
       }
-    };
 
-    setTimeout(() => {
-      onProcessingComplete(mockData);
-      toast({
-        title: "Processing Complete",
-        description: "URL analyzed successfully",
+      // Step 2: Scrape content
+      setProgress(30);
+      const scrapeResult = await FirecrawlService.scrapeWebsite(url);
+      
+      if (!scrapeResult.success) {
+        setValidation({
+          isValid: true,
+          isAccessible: false,
+          errorMessage: scrapeResult.error || 'Failed to access website'
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      // Step 3: Analyze content
+      setProgress(60);
+      const productData: ProductData = await ContentAnalyzer.analyzeContent(scrapeResult.data);
+
+      // Step 4: Complete
+      setProgress(100);
+      setValidation({
+        isValid: true,
+        isAccessible: true,
+        redirectedURL: url
       });
-    }, 500);
+
+      setTimeout(() => {
+        onProcessingComplete(productData);
+        toast({
+          title: "Analysis Complete",
+          description: "Affiliate URL analyzed successfully",
+        });
+      }, 500);
+
+    } catch (error) {
+      console.error('Error processing URL:', error);
+      setValidation({
+        isValid: false,
+        isAccessible: false,
+        errorMessage: 'Failed to process URL'
+      });
+      toast({
+        title: "Processing Failed",
+        description: "Unable to analyze the URL. Please try again.",
+        variant: "destructive"
+      });
+    }
 
     setIsProcessing(false);
   };
@@ -110,6 +139,34 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
         </div>
 
         <div className="space-y-4">
+          {showApiKeyInput && (
+            <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
+              <label htmlFor="apiKey" className="text-sm font-medium flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                Firecrawl API Key
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Enter your Firecrawl API key"
+                  className="flex-1"
+                />
+                <Button onClick={saveApiKey} variant="outline">
+                  Save
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Get your API key from{' '}
+                <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  firecrawl.dev
+                </a>
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label htmlFor="url" className="text-sm font-medium">
               Product or Sales Page URL
@@ -158,7 +215,7 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
           )}
 
           <Button
-            onClick={simulateProcessing}
+            onClick={processURL}
             disabled={!url || isProcessing}
             variant="hero"
             size="lg"
