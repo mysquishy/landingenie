@@ -30,6 +30,8 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
   const [showApiKeyInput, setShowApiKeyInput] = useState(!FirecrawlService.getApiKey() || !PerplexityService.getApiKey());
   const { toast } = useToast();
 
+  console.log('URLProcessor rendered - no apiKey reference should exist');
+
   const validateURL = (url: string): boolean => {
     try {
       new URL(url);
