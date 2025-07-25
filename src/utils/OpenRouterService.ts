@@ -96,10 +96,43 @@ export class OpenRouterService {
 
   static getAvailableModels() {
     return [
-      { id: 'openai/gpt-4', name: 'GPT-4', description: 'Most capable model' },
+      // OpenAI Models
+      { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Latest GPT-4 with 128k context' },
+      { id: 'openai/gpt-4', name: 'GPT-4', description: 'Most capable OpenAI model' },
       { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and cost-effective' },
-      { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Great for analysis' },
-      { id: 'meta-llama/llama-2-70b-chat', name: 'Llama 2 70B', description: 'Open source alternative' }
+      
+      // Anthropic Models
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Latest Claude model' },
+      { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', description: 'Most powerful Claude model' },
+      { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced performance' },
+      { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', description: 'Fastest Claude model' },
+      
+      // Google Models
+      { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5', description: 'Google\'s latest model' },
+      { id: 'google/gemini-pro', name: 'Gemini Pro', description: 'Google\'s flagship model' },
+      
+      // Meta Models
+      { id: 'meta-llama/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', description: 'Largest Llama model' },
+      { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', description: 'High performance open model' },
+      { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B', description: 'Fast and efficient' },
+      
+      // Mistral Models
+      { id: 'mistralai/mistral-large', name: 'Mistral Large', description: 'Mistral\'s most capable model' },
+      { id: 'mistralai/mistral-medium', name: 'Mistral Medium', description: 'Balanced performance' },
+      { id: 'mistralai/mixtral-8x7b-instruct', name: 'Mixtral 8x7B', description: 'Mixture of experts model' },
+      
+      // Cohere Models
+      { id: 'cohere/command-r-plus', name: 'Command R+', description: 'Cohere\'s flagship model' },
+      { id: 'cohere/command-r', name: 'Command R', description: 'Optimized for RAG' },
+      
+      // Perplexity Models
+      { id: 'perplexity/llama-3.1-sonar-large-128k-online', name: 'Perplexity Sonar Large', description: 'Online search capabilities' },
+      { id: 'perplexity/llama-3.1-sonar-small-128k-online', name: 'Perplexity Sonar Small', description: 'Fast with search' },
+      
+      // Other Popular Models
+      { id: 'qwen/qwen-2-72b-instruct', name: 'Qwen 2 72B', description: 'Alibaba\'s powerful model' },
+      { id: 'microsoft/wizardlm-2-8x22b', name: 'WizardLM 2 8x22B', description: 'Microsoft\'s mixture model' },
+      { id: 'nous-research/nous-hermes-2-mixtral-8x7b-dpo', name: 'Nous Hermes 2', description: 'Fine-tuned for following instructions' }
     ];
   }
 }
