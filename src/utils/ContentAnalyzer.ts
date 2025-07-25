@@ -87,8 +87,27 @@ export class ContentAnalyzer {
     `;
 
     try {
-      const { PerplexityService } = await import('./PerplexityService');
-      const structuredData = await PerplexityService.analyzeContent(analysisPrompt);
+      // Try OpenRouter first if available, then Perplexity as fallback
+      let structuredData;
+      
+      try {
+        const { OpenRouterService } = await import('./OpenRouterService');
+        if (OpenRouterService.getApiKey()) {
+          console.log('Using OpenRouter for content analysis');
+          structuredData = await OpenRouterService.analyzeContent(analysisPrompt);
+        } else {
+          throw new Error('OpenRouter API key not available');
+        }
+      } catch (openRouterError) {
+        console.log('OpenRouter failed, trying Perplexity:', openRouterError);
+        const { PerplexityService } = await import('./PerplexityService');
+        if (PerplexityService.getApiKey()) {
+          console.log('Using Perplexity for content analysis');
+          structuredData = await PerplexityService.analyzeContent(analysisPrompt);
+        } else {
+          throw new Error('No AI service available');
+        }
+      }
       
       // Validate and ensure all required fields
       return this.validateAndCleanData(structuredData);

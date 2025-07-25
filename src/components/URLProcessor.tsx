@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, AlertCircle, Loader2, Globe, Key } from 'lucide-react';
 import { FirecrawlService } from '@/utils/FirecrawlService';
 import { PerplexityService } from '@/utils/PerplexityService';
+import { OpenRouterService } from '@/utils/OpenRouterService';
 import { ApifyService } from '@/utils/ApifyService';
 import { IntelligentScraper } from '@/utils/IntelligentScraper';
 import { ContentAnalyzer, type ProductData } from '@/utils/ContentAnalyzer';
@@ -26,12 +27,14 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
   const [url, setUrl] = useState('');
   const [firecrawlApiKey, setFirecrawlApiKey] = useState(FirecrawlService.getApiKey() || '');
   const [perplexityApiKey, setPerplexityApiKey] = useState(PerplexityService.getApiKey() || '');
+  const [openRouterApiKey, setOpenRouterApiKey] = useState(OpenRouterService.getApiKey() || '');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-4');
   const [apifyToken, setApifyToken] = useState(ApifyService.getApiToken() || '');
   const [preferredService, setPreferredService] = useState<'auto' | 'firecrawl' | 'apify'>('auto');
   const [isProcessing, setIsProcessing] = useState(false);
   const [validation, setValidation] = useState<URLValidation | null>(null);
   const [progress, setProgress] = useState(0);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(!FirecrawlService.getApiKey() || !PerplexityService.getApiKey());
+  const [showApiKeyInput, setShowApiKeyInput] = useState(!FirecrawlService.getApiKey() || (!PerplexityService.getApiKey() && !OpenRouterService.getApiKey()));
   const { toast } = useToast();
 
   console.log('URLProcessor rendered - no apiKey reference should exist');
@@ -46,12 +49,23 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
   };
 
   const saveApiKeys = () => {
-    if (firecrawlApiKey.trim() && perplexityApiKey.trim()) {
+    const hasAiService = perplexityApiKey.trim() || openRouterApiKey.trim();
+    
+    if (firecrawlApiKey.trim() && hasAiService) {
       FirecrawlService.saveApiKey(firecrawlApiKey.trim());
-      PerplexityService.saveApiKey(perplexityApiKey.trim());
+      
+      if (perplexityApiKey.trim()) {
+        PerplexityService.saveApiKey(perplexityApiKey.trim());
+      }
+      
+      if (openRouterApiKey.trim()) {
+        OpenRouterService.saveApiKey(openRouterApiKey.trim());
+      }
+      
       if (apifyToken.trim()) {
         ApifyService.saveApiToken(apifyToken.trim());
       }
+      
       setShowApiKeyInput(false);
       toast({
         title: "API Keys Saved",
@@ -60,17 +74,19 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
     } else {
       toast({
         title: "Missing API Keys",
-        description: "Please enter both Firecrawl and Perplexity API keys",
+        description: "Please enter Firecrawl key and at least one AI service (Perplexity or OpenRouter)",
         variant: "destructive"
       });
     }
   };
 
   const processURL = async () => {
-    if (!FirecrawlService.getApiKey() || !PerplexityService.getApiKey()) {
+    const hasAiService = PerplexityService.getApiKey() || OpenRouterService.getApiKey();
+    
+    if (!FirecrawlService.getApiKey() || !hasAiService) {
       toast({
         title: "API Keys Required",
-        description: "Please enter both Firecrawl and Perplexity API keys first",
+        description: "Please enter Firecrawl key and at least one AI service (Perplexity or OpenRouter)",
         variant: "destructive"
       });
       setShowApiKeyInput(true);
@@ -198,7 +214,7 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
               <div className="space-y-2">
                 <label htmlFor="perplexityApiKey" className="text-sm font-medium flex items-center gap-2">
                   <Key className="w-4 h-4" />
-                  Perplexity API Key
+                  Perplexity API Key (Optional)
                 </label>
                 <Input
                   id="perplexityApiKey"
@@ -214,6 +230,49 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
                   </a>
                 </p>
               </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="openRouterApiKey" className="text-sm font-medium flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  OpenRouter API Key (Optional)
+                </label>
+                <Input
+                  id="openRouterApiKey"
+                  type="password"
+                  value={openRouterApiKey}
+                  onChange={(e) => setOpenRouterApiKey(e.target.value)}
+                  placeholder="Enter your OpenRouter API key"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Get your API key from{' '}
+                  <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    openrouter.ai
+                  </a>
+                </p>
+              </div>
+              
+              {openRouterApiKey && (
+                <div className="space-y-2">
+                  <label htmlFor="selectedModel" className="text-sm font-medium">
+                    OpenRouter Model
+                  </label>
+                  <select
+                    id="selectedModel"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full p-2 border border-input rounded-md bg-background text-foreground"
+                  >
+                    {OpenRouterService.getAvailableModels().map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name} - {model.description}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose the AI model for content analysis
+                  </p>
+                </div>
+              )}
               
               <div className="space-y-2">
                 <label htmlFor="apifyToken" className="text-sm font-medium flex items-center gap-2">
