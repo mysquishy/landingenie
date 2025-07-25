@@ -100,25 +100,33 @@ export class ContentAnalyzer {
         const { OpenRouterService } = await import('./OpenRouterService');
         if (OpenRouterService.getApiKey()) {
           console.log('Using OpenRouter for content analysis');
-          structuredData = await OpenRouterService.analyzeContent(analysisPrompt);
+          // Use a more capable model for better extraction
+          structuredData = await OpenRouterService.analyzeContent(analysisPrompt, 'anthropic/claude-3.5-sonnet');
         } else {
           throw new Error('OpenRouter API key not available');
         }
       } catch (openRouterError) {
         console.log('OpenRouter failed, trying Perplexity:', openRouterError);
-        const { PerplexityService } = await import('./PerplexityService');
-        if (PerplexityService.getApiKey()) {
-          console.log('Using Perplexity for content analysis');
-          structuredData = await PerplexityService.analyzeContent(analysisPrompt);
-        } else {
-          throw new Error('No AI service available');
+        try {
+          const { PerplexityService } = await import('./PerplexityService');
+          if (PerplexityService.getApiKey()) {
+            console.log('Using Perplexity for content analysis');
+            structuredData = await PerplexityService.analyzeContent(analysisPrompt);
+          } else {
+            throw new Error('No AI service available');
+          }
+        } catch (perplexityError) {
+          console.log('Both AI services failed, using enhanced fallback');
+          throw new Error('All AI services failed');
         }
       }
       
       // Validate and ensure all required fields
-      return this.validateAndCleanData(structuredData);
+      const validatedData = this.validateAndCleanData(structuredData);
+      console.log('AI analysis successful, completeness score:', validatedData.extractionQuality.completenessScore);
+      return validatedData;
     } catch (error) {
-      console.error('AI analysis failed, falling back to basic extraction:', error);
+      console.error('AI analysis failed, falling back to enhanced extraction:', error);
       return this.fallbackAnalysis(markdown, metadata);
     }
   }
@@ -161,33 +169,51 @@ export class ContentAnalyzer {
   }
 
   private static fallbackAnalysis(markdown: string, metadata: any): ProductData {
+    console.log('Running enhanced fallback analysis on content length:', markdown.length);
+    
     const productName = this.extractProductName(markdown, metadata.title);
     const mainBenefit = this.extractMainBenefit(markdown);
     const targetAudience = this.extractTargetAudience(markdown);
     const industry = this.classifyIndustry(markdown);
     const category = this.classifyCategory(markdown);
     const pricePoint = this.determinePricePoint(markdown);
+    const emotionalOutcome = this.extractEmotionalOutcome(markdown);
+    
+    // Calculate a better quality score based on what we found
+    let qualityScore = 0.3; // Base score
+    if (productName !== 'Unknown Product' && productName !== 'Product Analysis') qualityScore += 0.2;
+    if (mainBenefit.length > 30 && !mainBenefit.includes('Transform your results')) qualityScore += 0.2;
+    if (targetAudience !== 'professionals and entrepreneurs') qualityScore += 0.1;
+    if (industry !== 'General') qualityScore += 0.1;
+    if (category !== 'info') qualityScore += 0.1;
+    
+    const missingFields = [];
+    if (mainBenefit.includes('Transform your results')) missingFields.push('mainBenefit');
+    if (targetAudience === 'professionals and entrepreneurs') missingFields.push('targetAudience');
+    if (emotionalOutcome.includes('confidence and success')) missingFields.push('emotionalOutcome');
+    
+    console.log('Fallback analysis results:', { productName, mainBenefit: mainBenefit.substring(0, 50), qualityScore });
     
     return {
       dreamOutcome: {
         mainBenefit,
-        secondaryBenefits: [],
+        secondaryBenefits: this.extractSecondaryBenefits(markdown),
         targetAudience,
-        emotionalOutcome: this.extractEmotionalOutcome(markdown)
+        emotionalOutcome
       },
       perceivedLikelihood: {
-        testimonials: [],
-        socialProofNumbers: [],
-        guarantees: []
+        testimonials: this.extractTestimonials(markdown),
+        socialProofNumbers: this.extractSocialProof(markdown),
+        guarantees: this.extractGuarantees(markdown)
       },
       timeDelay: {
-        deliveryTimeframe: 'MISSING',
-        resultsTimeframe: 'MISSING'
+        deliveryTimeframe: this.extractDeliveryTime(markdown),
+        resultsTimeframe: this.extractResultsTime(markdown)
       },
       effortSacrifice: {
-        difficultyLevel: 5,
-        prerequisites: [],
-        easeOfUse: 'MISSING'
+        difficultyLevel: this.assessDifficulty(markdown),
+        prerequisites: this.extractPrerequisites(markdown),
+        easeOfUse: this.extractEaseOfUse(markdown)
       },
       productInfo: {
         name: productName,
@@ -196,9 +222,9 @@ export class ContentAnalyzer {
         pricePoint: this.validatePricePoint(pricePoint) || 'medium'
       },
       extractionQuality: {
-        completenessScore: 0.3,
-        confidenceLevel: 'low',
-        missingFields: ['secondaryBenefits', 'testimonials', 'guarantees', 'timeDelay', 'effortSacrifice']
+        completenessScore: Math.min(qualityScore, 1.0),
+        confidenceLevel: qualityScore > 0.7 ? 'high' : qualityScore > 0.5 ? 'medium' : 'low',
+        missingFields
       }
     };
   }
@@ -219,40 +245,96 @@ export class ContentAnalyzer {
   }
 
   private static extractProductName(markdown: string, title: string): string {
-    // Try to extract from title first
+    // Try to extract from title first, clean it up
     if (title && title.length > 0 && title !== 'Untitled') {
-      return title.replace(/[|\-–—].*$/, '').trim();
+      const cleanTitle = title
+        .replace(/[|\-–—].*$/, '') // Remove everything after separators
+        .replace(/\s*[-–—]\s*.*$/, '') // Alternative separator cleanup
+        .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
+        .trim();
+      if (cleanTitle.length > 2) {
+        return cleanTitle;
+      }
     }
 
-    // Extract from first H1 or H2
-    const headingMatch = markdown.match(/^#{1,2}\s+(.+)$/m);
-    if (headingMatch) {
-      return headingMatch[1].trim();
+    // Extract from first meaningful heading
+    const headingMatches = markdown.match(/^#{1,3}\s+(.+)$/gm);
+    if (headingMatches) {
+      for (const heading of headingMatches) {
+        const cleanHeading = heading.replace(/^#+\s+/, '').trim();
+        if (cleanHeading.length > 3 && cleanHeading.length < 80 &&
+            !cleanHeading.toLowerCase().includes('welcome') &&
+            !cleanHeading.toLowerCase().includes('home') &&
+            !cleanHeading.toLowerCase().includes('about')) {
+          return cleanHeading;
+        }
+      }
     }
 
-    // Fallback to first meaningful line
-    const lines = markdown.split('\n').filter(line => line.trim().length > 10);
-    return lines[0]?.trim() || 'Unknown Product';
+    // Look for product names in strong text or links
+    const strongMatches = markdown.match(/\*\*([^*]{3,50})\*\*/g);
+    if (strongMatches) {
+      for (const match of strongMatches) {
+        const clean = match.replace(/\*\*/g, '').trim();
+        if (clean.length > 3 && clean.length < 50) {
+          return clean;
+        }
+      }
+    }
+
+    // Fallback to first meaningful content line
+    const lines = markdown.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 10 && line.length < 100)
+      .filter(line => !line.startsWith('#') && !line.startsWith('*') && !line.startsWith('-'));
+    
+    return lines[0] || 'Product Analysis';
   }
 
   private static extractMainBenefit(markdown: string): string {
-    // Look for benefit-oriented phrases
+    // First try to find clear benefit statements
     const benefitPatterns = [
-      /(?:get|achieve|learn|discover|unlock|master|increase|improve|boost|grow|build|create|generate|earn|save|transform|eliminate)\s+([^.!?\n]{20,100})/gi,
-      /(?:helps? you|allows? you to|enables? you to)\s+([^.!?\n]{20,100})/gi,
-      /(?:guaranteed to|proven to|designed to)\s+([^.!?\n]{20,100})/gi
+      /(?:get|achieve|learn|discover|unlock|master|increase|improve|boost|grow|build|create|generate|earn|save|transform|eliminate|reduce|stop|prevent|avoid)\s+([^.!?\n]{15,120})/gi,
+      /(?:helps? you|allows? you to|enables? you to|designed to help you)\s+([^.!?\n]{15,120})/gi,
+      /(?:guaranteed to|proven to|designed to)\s+([^.!?\n]{15,120})/gi,
+      /(?:solution (?:for|to)|answer to|key to)\s+([^.!?\n]{15,120})/gi,
+      /(?:finally|now you can|you can now)\s+([^.!?\n]{15,120})/gi
     ];
 
     for (const pattern of benefitPatterns) {
       const matches = [...markdown.matchAll(pattern)];
       if (matches.length > 0) {
-        return matches[0][1].trim();
+        const benefit = matches[0][1].trim();
+        if (benefit.length > 20 && !benefit.toLowerCase().includes('undefined')) {
+          return benefit;
+        }
       }
     }
 
-    // Fallback to first paragraph
-    const paragraphs = markdown.split('\n\n').filter(p => p.trim().length > 50);
-    return paragraphs[0]?.trim().substring(0, 100) + '...' || 'Transform your results';
+    // Try to find value propositions in headers
+    const headers = markdown.match(/^#{1,3}\s+(.+)$/gm);
+    if (headers) {
+      for (const header of headers) {
+        const cleanHeader = header.replace(/^#+\s+/, '').trim();
+        if (cleanHeader.length > 20 && cleanHeader.length < 100) {
+          return cleanHeader;
+        }
+      }
+    }
+
+    // Look for compelling first sentences
+    const sentences = markdown.split(/[.!?]+/).filter(s => s.trim().length > 30);
+    for (const sentence of sentences.slice(0, 5)) {
+      const clean = sentence.trim();
+      if (clean.length > 30 && clean.length < 150 && 
+          !clean.toLowerCase().includes('cookie') && 
+          !clean.toLowerCase().includes('privacy') &&
+          !clean.toLowerCase().includes('terms')) {
+        return clean;
+      }
+    }
+
+    return 'Transform your results with this powerful solution';
   }
 
   private static extractTargetAudience(markdown: string): string {
@@ -351,6 +433,144 @@ export class ContentAnalyzer {
     }
 
     return 'confidence and success in your goals';
+  }
+
+  private static extractSecondaryBenefits(markdown: string): string[] {
+    const benefits = [];
+    const listItems = markdown.match(/^[*\-+]\s+(.+)$/gm);
+    
+    if (listItems) {
+      for (const item of listItems.slice(0, 5)) {
+        const clean = item.replace(/^[*\-+]\s+/, '').trim();
+        if (clean.length > 15 && clean.length < 100) {
+          benefits.push(clean);
+        }
+      }
+    }
+    
+    return benefits;
+  }
+
+  private static extractTestimonials(markdown: string): string[] {
+    const testimonials = [];
+    const quoteMatches = markdown.match(/"([^"]{30,200})"/g);
+    
+    if (quoteMatches) {
+      for (const quote of quoteMatches.slice(0, 3)) {
+        testimonials.push(quote.replace(/"/g, ''));
+      }
+    }
+    
+    return testimonials;
+  }
+
+  private static extractSocialProof(markdown: string): string[] {
+    const proofNumbers = [];
+    const numberPatterns = [
+      /(\d+(?:,\d{3})*)\s*(?:customers|users|clients|students|members)/gi,
+      /(\d+(?:\.\d+)?[%])\s*(?:success|satisfaction|results)/gi,
+      /(\d+(?:,\d{3})*)\s*(?:downloads|sales|reviews)/gi
+    ];
+
+    for (const pattern of numberPatterns) {
+      const matches = [...markdown.matchAll(pattern)];
+      for (const match of matches.slice(0, 3)) {
+        proofNumbers.push(match[0]);
+      }
+    }
+    
+    return proofNumbers;
+  }
+
+  private static extractGuarantees(markdown: string): string[] {
+    const guarantees = [];
+    const guaranteePatterns = [
+      /money.{0,20}back.{0,20}guarantee/gi,
+      /(\d+).{0,10}day.{0,10}guarantee/gi,
+      /satisfaction.{0,20}guaranteed/gi,
+      /risk.{0,10}free/gi
+    ];
+
+    for (const pattern of guaranteePatterns) {
+      const matches = [...markdown.matchAll(pattern)];
+      for (const match of matches) {
+        guarantees.push(match[0]);
+      }
+    }
+    
+    return guarantees;
+  }
+
+  private static extractDeliveryTime(markdown: string): string {
+    const timePatterns = [
+      /(?:instant|immediate|within\s+\d+\s+(?:minutes|hours|days))/gi,
+      /(?:download|access)\s+(?:immediately|instantly|right away)/gi
+    ];
+
+    for (const pattern of timePatterns) {
+      const match = markdown.match(pattern);
+      if (match) return match[0];
+    }
+    
+    return 'MISSING';
+  }
+
+  private static extractResultsTime(markdown: string): string {
+    const resultPatterns = [
+      /(?:results|benefits|changes)\s+(?:in|within)\s+(\d+\s+(?:days|weeks|months))/gi,
+      /(?:see|notice|experience)\s+(?:results|benefits|changes)\s+(?:in|within)\s+(\d+\s+(?:days|weeks|months))/gi
+    ];
+
+    for (const pattern of resultPatterns) {
+      const match = markdown.match(pattern);
+      if (match) return match[1] || match[0];
+    }
+    
+    return 'MISSING';
+  }
+
+  private static assessDifficulty(markdown: string): number {
+    const easyWords = ['easy', 'simple', 'effortless', 'automatic', 'beginner'];
+    const hardWords = ['advanced', 'complex', 'expert', 'difficult', 'challenging'];
+    
+    const content = markdown.toLowerCase();
+    const easyCount = easyWords.filter(word => content.includes(word)).length;
+    const hardCount = hardWords.filter(word => content.includes(word)).length;
+    
+    if (easyCount > hardCount) return 3;
+    if (hardCount > easyCount) return 7;
+    return 5;
+  }
+
+  private static extractPrerequisites(markdown: string): string[] {
+    const prerequisites = [];
+    const prereqPatterns = [
+      /(?:requires?|need|must have)\s+([^.!?\n]{10,80})/gi,
+      /(?:prerequisite|requirement):\s*([^.!?\n]{10,80})/gi
+    ];
+
+    for (const pattern of prereqPatterns) {
+      const matches = [...markdown.matchAll(pattern)];
+      for (const match of matches.slice(0, 3)) {
+        prerequisites.push(match[1].trim());
+      }
+    }
+    
+    return prerequisites;
+  }
+
+  private static extractEaseOfUse(markdown: string): string {
+    const easePatterns = [
+      /(?:easy to use|user.?friendly|simple to operate|intuitive)/gi,
+      /(?:plug.?and.?play|one.?click|drag.?and.?drop)/gi
+    ];
+
+    for (const pattern of easePatterns) {
+      const match = markdown.match(pattern);
+      if (match) return match[0];
+    }
+    
+    return 'MISSING';
   }
 
   private static calculateQualityScore(data: any): number {
