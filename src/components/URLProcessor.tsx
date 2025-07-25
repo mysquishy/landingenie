@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, AlertCircle, Loader2, Globe, Key } from 'lucide-react';
 import { FirecrawlService } from '@/utils/FirecrawlService';
+import { PerplexityService } from '@/utils/PerplexityService';
 import { ContentAnalyzer, type ProductData } from '@/utils/ContentAnalyzer';
 
 interface URLValidation {
@@ -21,11 +22,12 @@ interface URLProcessorProps {
 
 export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
   const [url, setUrl] = useState('');
-  const [apiKey, setApiKey] = useState(FirecrawlService.getApiKey() || '');
+  const [firecrawlApiKey, setFirecrawlApiKey] = useState(FirecrawlService.getApiKey() || '');
+  const [perplexityApiKey, setPerplexityApiKey] = useState(PerplexityService.getApiKey() || '');
   const [isProcessing, setIsProcessing] = useState(false);
   const [validation, setValidation] = useState<URLValidation | null>(null);
   const [progress, setProgress] = useState(0);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(!FirecrawlService.getApiKey());
+  const [showApiKeyInput, setShowApiKeyInput] = useState(!FirecrawlService.getApiKey() || !PerplexityService.getApiKey());
   const { toast } = useToast();
 
   const validateURL = (url: string): boolean => {
@@ -37,22 +39,29 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
     }
   };
 
-  const saveApiKey = () => {
-    if (apiKey.trim()) {
-      FirecrawlService.saveApiKey(apiKey.trim());
+  const saveApiKeys = () => {
+    if (firecrawlApiKey.trim() && perplexityApiKey.trim()) {
+      FirecrawlService.saveApiKey(firecrawlApiKey.trim());
+      PerplexityService.saveApiKey(perplexityApiKey.trim());
       setShowApiKeyInput(false);
       toast({
-        title: "API Key Saved",
-        description: "You can now analyze affiliate URLs",
+        title: "API Keys Saved",
+        description: "You can now analyze affiliate URLs with AI-powered analysis",
+      });
+    } else {
+      toast({
+        title: "Missing API Keys",
+        description: "Please enter both Firecrawl and Perplexity API keys",
+        variant: "destructive"
       });
     }
   };
 
   const processURL = async () => {
-    if (!FirecrawlService.getApiKey()) {
+    if (!FirecrawlService.getApiKey() || !PerplexityService.getApiKey()) {
       toast({
-        title: "API Key Required",
-        description: "Please enter your Firecrawl API key first",
+        title: "API Keys Required",
+        description: "Please enter both Firecrawl and Perplexity API keys first",
         variant: "destructive"
       });
       setShowApiKeyInput(true);
@@ -140,30 +149,50 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
 
         <div className="space-y-4">
           {showApiKeyInput && (
-            <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
-              <label htmlFor="apiKey" className="text-sm font-medium flex items-center gap-2">
-                <Key className="w-4 h-4" />
-                Firecrawl API Key
-              </label>
-              <div className="flex gap-2">
+            <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+              <div className="space-y-2">
+                <label htmlFor="firecrawlApiKey" className="text-sm font-medium flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  Firecrawl API Key
+                </label>
                 <Input
-                  id="apiKey"
+                  id="firecrawlApiKey"
                   type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  value={firecrawlApiKey}
+                  onChange={(e) => setFirecrawlApiKey(e.target.value)}
                   placeholder="Enter your Firecrawl API key"
-                  className="flex-1"
                 />
-                <Button onClick={saveApiKey} variant="outline">
-                  Save
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Get your API key from{' '}
+                  <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    firecrawl.dev
+                  </a>
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Get your API key from{' '}
-                <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  firecrawl.dev
-                </a>
-              </p>
+              
+              <div className="space-y-2">
+                <label htmlFor="perplexityApiKey" className="text-sm font-medium flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  Perplexity API Key
+                </label>
+                <Input
+                  id="perplexityApiKey"
+                  type="password"
+                  value={perplexityApiKey}
+                  onChange={(e) => setPerplexityApiKey(e.target.value)}
+                  placeholder="Enter your Perplexity API key"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Get your API key from{' '}
+                  <a href="https://perplexity.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    perplexity.ai
+                  </a>
+                </p>
+              </div>
+              
+              <Button onClick={saveApiKeys} variant="outline" className="w-full">
+                Save API Keys
+              </Button>
             </div>
           )}
 

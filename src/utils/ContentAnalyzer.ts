@@ -1,18 +1,39 @@
 export interface ProductData {
-  productInfo: {
-    name: string;
-    category: string;
-    industry: string;
-    pricePoint: string;
-  };
+  // Core Value Equation Components (Alex Hormozi Framework)
   dreamOutcome: {
     mainBenefit: string;
+    secondaryBenefits: string[];
     targetAudience: string;
     emotionalOutcome: string;
   };
+  perceivedLikelihood: {
+    testimonials: string[];
+    socialProofNumbers: string[];
+    guarantees: string[];
+  };
+  timeDelay: {
+    deliveryTimeframe: string;
+    resultsTimeframe: string;
+  };
+  effortSacrifice: {
+    difficultyLevel: number; // 1-10
+    prerequisites: string[];
+    easeOfUse: string;
+  };
+  
+  // Classification Data
+  productInfo: {
+    name: string;
+    category: 'software' | 'physical' | 'service' | 'info' | 'health';
+    industry: string;
+    pricePoint: 'low' | 'medium' | 'high' | 'premium';
+  };
+  
+  // Quality Metadata
   extractionQuality: {
-    completenessScore: number;
-    confidenceLevel: string;
+    completenessScore: number; // 0-1
+    confidenceLevel: 'high' | 'medium' | 'low';
+    missingFields: string[];
   };
 }
 
@@ -20,47 +41,156 @@ export class ContentAnalyzer {
   static async analyzeContent(scrapedData: any): Promise<ProductData> {
     const { markdown, metadata } = scrapedData;
     
-    // Extract product name from title or first heading
+    const analysisPrompt = `
+      EXTRACT LANDING PAGE DATA from this content for Alex Hormozi's Value Equation:
+      
+      Content: ${JSON.stringify({ markdown: markdown.substring(0, 8000), metadata })}
+      
+      RETURN STRUCTURED JSON WITH EXACTLY THIS FORMAT:
+      {
+        "dreamOutcome": {
+          "mainBenefit": "primary transformation or outcome",
+          "secondaryBenefits": ["benefit1", "benefit2", "benefit3"],
+          "targetAudience": "specific audience description",
+          "emotionalOutcome": "emotional transformation"
+        },
+        "perceivedLikelihood": {
+          "testimonials": ["testimonial1", "testimonial2"],
+          "socialProofNumbers": ["metric1", "metric2"],
+          "guarantees": ["guarantee1", "guarantee2"]
+        },
+        "timeDelay": {
+          "deliveryTimeframe": "how quickly they get access",
+          "resultsTimeframe": "how quickly they see results"
+        },
+        "effortSacrifice": {
+          "difficultyLevel": 5,
+          "prerequisites": ["requirement1", "requirement2"],
+          "easeOfUse": "description of ease"
+        },
+        "productInfo": {
+          "name": "product name",
+          "category": "software|physical|service|info|health",
+          "industry": "industry name",
+          "pricePoint": "low|medium|high|premium"
+        },
+        "extractionQuality": {
+          "completenessScore": 0.8,
+          "confidenceLevel": "high|medium|low",
+          "missingFields": ["field1", "field2"]
+        }
+      }
+      
+      Mark missing data as "MISSING" - do not fabricate information.
+      Provide confidence scores based on data availability.
+      Ensure all fields are present in the response.
+    `;
+
+    try {
+      const { PerplexityService } = await import('./PerplexityService');
+      const structuredData = await PerplexityService.analyzeContent(analysisPrompt);
+      
+      // Validate and ensure all required fields
+      return this.validateAndCleanData(structuredData);
+    } catch (error) {
+      console.error('AI analysis failed, falling back to basic extraction:', error);
+      return this.fallbackAnalysis(markdown, metadata);
+    }
+  }
+
+  private static validateAndCleanData(data: any): ProductData {
+    // Ensure all required fields exist with defaults
+    return {
+      dreamOutcome: {
+        mainBenefit: data.dreamOutcome?.mainBenefit || 'MISSING',
+        secondaryBenefits: data.dreamOutcome?.secondaryBenefits || [],
+        targetAudience: data.dreamOutcome?.targetAudience || 'MISSING',
+        emotionalOutcome: data.dreamOutcome?.emotionalOutcome || 'MISSING'
+      },
+      perceivedLikelihood: {
+        testimonials: data.perceivedLikelihood?.testimonials || [],
+        socialProofNumbers: data.perceivedLikelihood?.socialProofNumbers || [],
+        guarantees: data.perceivedLikelihood?.guarantees || []
+      },
+      timeDelay: {
+        deliveryTimeframe: data.timeDelay?.deliveryTimeframe || 'MISSING',
+        resultsTimeframe: data.timeDelay?.resultsTimeframe || 'MISSING'
+      },
+      effortSacrifice: {
+        difficultyLevel: data.effortSacrifice?.difficultyLevel || 5,
+        prerequisites: data.effortSacrifice?.prerequisites || [],
+        easeOfUse: data.effortSacrifice?.easeOfUse || 'MISSING'
+      },
+      productInfo: {
+        name: data.productInfo?.name || 'Unknown Product',
+        category: this.validateCategory(data.productInfo?.category) || 'info',
+        industry: data.productInfo?.industry || 'General',
+        pricePoint: this.validatePricePoint(data.productInfo?.pricePoint) || 'medium'
+      },
+      extractionQuality: {
+        completenessScore: data.extractionQuality?.completenessScore || 0.5,
+        confidenceLevel: this.validateConfidenceLevel(data.extractionQuality?.confidenceLevel) || 'medium',
+        missingFields: data.extractionQuality?.missingFields || []
+      }
+    };
+  }
+
+  private static fallbackAnalysis(markdown: string, metadata: any): ProductData {
     const productName = this.extractProductName(markdown, metadata.title);
-    
-    // Extract main benefit from content
     const mainBenefit = this.extractMainBenefit(markdown);
-    
-    // Determine target audience
     const targetAudience = this.extractTargetAudience(markdown);
-    
-    // Classify industry and category
     const industry = this.classifyIndustry(markdown);
     const category = this.classifyCategory(markdown);
-    
-    // Determine price point
     const pricePoint = this.determinePricePoint(markdown);
     
-    // Calculate quality score
-    const qualityScore = this.calculateQualityScore({
-      productName,
-      mainBenefit,
-      targetAudience,
-      industry
-    });
-
     return {
-      productInfo: {
-        name: productName,
-        category,
-        industry,
-        pricePoint
-      },
       dreamOutcome: {
         mainBenefit,
+        secondaryBenefits: [],
         targetAudience,
         emotionalOutcome: this.extractEmotionalOutcome(markdown)
       },
+      perceivedLikelihood: {
+        testimonials: [],
+        socialProofNumbers: [],
+        guarantees: []
+      },
+      timeDelay: {
+        deliveryTimeframe: 'MISSING',
+        resultsTimeframe: 'MISSING'
+      },
+      effortSacrifice: {
+        difficultyLevel: 5,
+        prerequisites: [],
+        easeOfUse: 'MISSING'
+      },
+      productInfo: {
+        name: productName,
+        category: this.validateCategory(category) || 'info',
+        industry,
+        pricePoint: this.validatePricePoint(pricePoint) || 'medium'
+      },
       extractionQuality: {
-        completenessScore: qualityScore,
-        confidenceLevel: qualityScore > 0.7 ? 'high' : qualityScore > 0.4 ? 'medium' : 'low'
+        completenessScore: 0.3,
+        confidenceLevel: 'low',
+        missingFields: ['secondaryBenefits', 'testimonials', 'guarantees', 'timeDelay', 'effortSacrifice']
       }
     };
+  }
+
+  private static validateCategory(category: string): 'software' | 'physical' | 'service' | 'info' | 'health' {
+    const validCategories = ['software', 'physical', 'service', 'info', 'health'];
+    return validCategories.includes(category) ? category as any : 'info';
+  }
+
+  private static validatePricePoint(pricePoint: string): 'low' | 'medium' | 'high' | 'premium' {
+    const validPricePoints = ['low', 'medium', 'high', 'premium'];
+    return validPricePoints.includes(pricePoint) ? pricePoint as any : 'medium';
+  }
+
+  private static validateConfidenceLevel(level: string): 'high' | 'medium' | 'low' {
+    const validLevels = ['high', 'medium', 'low'];
+    return validLevels.includes(level) ? level as any : 'medium';
   }
 
   private static extractProductName(markdown: string, title: string): string {
