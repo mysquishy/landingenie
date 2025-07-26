@@ -223,12 +223,19 @@ export class FirecrawlService {
 
     // Fallback: Standard scraping with enhanced configuration
     console.log('Using standard scraping configuration...');
-    return await this.firecrawlApp!.scrapeUrl(url, {
-      formats: ['markdown', 'html'],
-      onlyMainContent: true,
-      waitFor: 3000,
-      timeout: 15000
-    }) as any;
+    try {
+      const result = await this.firecrawlApp!.scrapeUrl(url, {
+        formats: ['markdown', 'html'],
+        onlyMainContent: true,
+        waitFor: 3000,
+        timeout: 15000
+      }) as any;
+      console.log('Firecrawl scraping completed successfully:', result.success);
+      return result;
+    } catch (error) {
+      console.error('Firecrawl scraping failed:', error);
+      throw error;
+    }
   }
 
   private static async scrapeRegularPage(url: string): Promise<FirecrawlResponse> {
