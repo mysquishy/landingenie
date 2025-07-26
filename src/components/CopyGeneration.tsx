@@ -474,8 +474,8 @@ Return only the guarantee text.`
                     <div>
                       <h4 className="font-semibold mb-2">Key Benefits:</h4>
                       <ul className="list-disc list-inside space-y-1">
-                        {generatedCopy.benefits.map((benefit, index) => (
-                          <li key={index}>{benefit}</li>
+                        {Array.isArray(generatedCopy.benefits) && generatedCopy.benefits.map((benefit, index) => (
+                          <li key={index}>{typeof benefit === 'string' ? benefit : String(benefit)}</li>
                         ))}
                       </ul>
                     </div>
