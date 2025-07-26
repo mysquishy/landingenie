@@ -171,10 +171,42 @@ export class FirecrawlService {
         scrapeResponse = await this.scrapeRegularPage(url);
       }
 
-      if (!scrapeResponse.success || !scrapeResponse.data) {
+      if (!scrapeResponse.success) {
         return { 
           success: false, 
           error: (scrapeResponse as ErrorResponse).error || 'Failed to scrape website' 
+        };
+      }
+
+      // Handle case where Firecrawl succeeds but returns no data
+      if (!scrapeResponse.data) {
+        console.log('Firecrawl succeeded but returned no data, using minimal fallback');
+        const fallbackData = {
+          markdown: 'No content extracted',
+          html: '',
+          metadata: { 
+            title: 'Unknown Page', 
+            description: 'No description available',
+            sourceURL: url 
+          }
+        };
+        
+        // Still run analysis on empty data to get proper structure
+        const analyzed = await this.analyzeScrapedContent(fallbackData, false);
+        const processingTime = Date.now() - startTime;
+        
+        return {
+          success: true,
+          data: {
+            raw: fallbackData,
+            analyzed,
+            metadata: {
+              processingTime,
+              finalURL: url,
+              isAffiliatePage: false,
+              extractionMethod: analyzed.extractionMethod
+            }
+          }
         };
       }
 
