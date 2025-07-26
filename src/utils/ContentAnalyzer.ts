@@ -98,21 +98,31 @@ export class ContentAnalyzer {
       
       try {
         const { OpenRouterService } = await import('./OpenRouterService');
-        if (OpenRouterService.getApiKey()) {
+        const apiKey = OpenRouterService.getApiKey();
+        console.log('Checking OpenRouter API key availability:', !!apiKey);
+        
+        if (apiKey) {
           console.log('Using OpenRouter for content analysis');
           // Use a more capable model for better extraction
           structuredData = await OpenRouterService.analyzeContent(analysisPrompt, 'anthropic/claude-3.5-sonnet');
+          console.log('OpenRouter analysis completed successfully');
         } else {
+          console.log('OpenRouter API key not found');
           throw new Error('OpenRouter API key not available');
         }
       } catch (openRouterError) {
         console.log('OpenRouter failed, trying Perplexity:', openRouterError);
         try {
           const { PerplexityService } = await import('./PerplexityService');
-          if (PerplexityService.getApiKey()) {
+          const apiKey = PerplexityService.getApiKey();
+          console.log('Checking Perplexity API key availability:', !!apiKey);
+          
+          if (apiKey) {
             console.log('Using Perplexity for content analysis');
             structuredData = await PerplexityService.analyzeContent(analysisPrompt);
+            console.log('Perplexity analysis completed successfully');
           } else {
+            console.log('Perplexity API key not found');
             throw new Error('No AI service available');
           }
         } catch (perplexityError) {
