@@ -279,7 +279,7 @@ export class FirecrawlService {
   private static async scrapeRegularPage(url: string): Promise<FirecrawlResponse> {
     console.log('Scraping regular page with standard configuration...');
     
-    return await this.firecrawlApp!.scrapeUrl(url, {
+    const response = await this.firecrawlApp!.scrapeUrl(url, {
       formats: ['markdown', 'html'],
       waitFor: 3000,
       timeout: 15000,
@@ -294,6 +294,9 @@ export class FirecrawlService {
         'noscript', 'iframe'
       ]
     }) as any;
+
+    console.log('FIRECRAWL ACTUAL RESPONSE:', JSON.stringify(response, null, 2));
+    return response;
   }
 
   // ==================== CONTENT ANALYSIS ====================
