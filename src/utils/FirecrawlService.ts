@@ -168,7 +168,7 @@ export class FirecrawlService {
         scrapeResponse = await this.scrapeRegularPage(url);
       }
 
-      if (!scrapeResponse.success) {
+      if (!scrapeResponse.success || !scrapeResponse.data) {
         return { 
           success: false, 
           error: (scrapeResponse as ErrorResponse).error || 'Failed to scrape website' 
