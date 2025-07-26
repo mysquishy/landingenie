@@ -256,21 +256,18 @@ export class FirecrawlService {
     try {
       const result = await this.firecrawlApp!.scrapeUrl(url, {
         formats: ['markdown', 'html'],
-        onlyMainContent: true,
-        blockAds: true,
+        onlyMainContent: false, // Get all content for affiliate pages
+        blockAds: false, // Don't block ads - might block content
         removeBase64Images: true,
         mobile: false,
-        waitFor: 5000,
-        timeout: 20000,
-        includeTags: [
-          'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 
-          'article', 'main', 'blockquote', 'strong', 'em', 'b', 'i',
-          'form', 'input', 'label', 'table', 'td', 'th'
-        ],
-        excludeTags: [
-          'script', 'style', 'nav', 'footer', 'header', 'aside', 
-          'noscript', 'iframe', 'canvas', 'svg'
+        waitFor: 10000, // Wait longer for JS to load
+        timeout: 30000, // Increase timeout
+        skipTlsVerification: true, // Help with problematic SSL
+        actions: [
+          {
+            type: "wait",
+            milliseconds: 5000
+          }
         ]
       }) as any;
       
