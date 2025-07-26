@@ -122,6 +122,12 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
       setProgress(40);
       const scrapeResult = await IntelligentScraper.scrapeURL(url, preferredService);
       
+      console.log('Scrape result structure:', {
+        success: scrapeResult.success,
+        method: scrapeResult.method,
+        dataKeys: scrapeResult.data ? Object.keys(scrapeResult.data) : 'no data'
+      });
+      
       if (!scrapeResult.success) {
         setValidation({
           isValid: true,
