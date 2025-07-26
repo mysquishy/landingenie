@@ -231,6 +231,12 @@ export class FirecrawlService {
         timeout: 15000
       }) as any;
       console.log('Firecrawl scraping completed successfully:', result.success);
+      console.log('Firecrawl result details:', { 
+        success: result.success, 
+        hasData: !!result.data,
+        dataKeys: result.data ? Object.keys(result.data) : 'none',
+        error: result.error 
+      });
       return result;
     } catch (error) {
       console.error('Firecrawl scraping failed:', error);
