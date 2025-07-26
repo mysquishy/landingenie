@@ -247,43 +247,46 @@ export class FirecrawlService {
     console.log('Scraping affiliate page with enhanced configuration...');
     
     try {
-      // Skip LLM extraction for now - focus on basic scraping
-      console.log('Attempting basic scraping due to API limitations...');
-    } catch (error) {
-      console.warn('LLM extraction skipped:', error);
-    }
-
-    // Fallback: Standard scraping with enhanced configuration
-    console.log('Using standard scraping configuration...');
-    try {
       const result = await this.firecrawlApp!.scrapeUrl(url, {
         formats: ['markdown', 'html'],
         onlyMainContent: true,
-        waitFor: 3000,
-        timeout: 15000
+        blockAds: true,
+        removeBase64Images: true,
+        mobile: false,
+        waitFor: 5000,
+        timeout: 20000,
+        includeTags: [
+          'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 
+          'article', 'main', 'blockquote', 'strong', 'em', 'b', 'i',
+          'form', 'input', 'label', 'table', 'td', 'th'
+        ],
+        excludeTags: [
+          'script', 'style', 'nav', 'footer', 'header', 'aside', 
+          'noscript', 'iframe', 'canvas', 'svg'
+        ]
       }) as any;
-      console.log('Firecrawl scraping completed successfully:', result.success);
-      console.log('Firecrawl result details:', { 
-        success: result.success, 
-        hasData: !!result.data,
-        dataKeys: result.data ? Object.keys(result.data) : 'none',
-        error: result.error 
-      });
+      
+      console.log('Affiliate page scraping completed:', result.success);
+      console.log('FIRECRAWL AFFILIATE RESPONSE:', JSON.stringify(result, null, 2));
       return result;
     } catch (error) {
-      console.error('Firecrawl scraping failed:', error);
+      console.error('Firecrawl affiliate scraping failed:', error);
       throw error;
     }
   }
 
   private static async scrapeRegularPage(url: string): Promise<FirecrawlResponse> {
-    console.log('Scraping regular page with standard configuration...');
+    console.log('Scraping regular page with enhanced configuration...');
     
     const response = await this.firecrawlApp!.scrapeUrl(url, {
       formats: ['markdown', 'html'],
+      onlyMainContent: true,
+      blockAds: true,
+      removeBase64Images: true,
+      mobile: false,
       waitFor: 3000,
       timeout: 15000,
-      onlyMainContent: true,
       includeTags: [
         'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 
@@ -291,11 +294,11 @@ export class FirecrawlService {
       ],
       excludeTags: [
         'script', 'style', 'nav', 'footer', 'header', 'aside', 
-        'noscript', 'iframe'
+        'noscript', 'iframe', 'canvas', 'svg'
       ]
     }) as any;
 
-    console.log('FIRECRAWL ACTUAL RESPONSE:', JSON.stringify(response, null, 2));
+    console.log('FIRECRAWL REGULAR RESPONSE:', JSON.stringify(response, null, 2));
     return response;
   }
 
