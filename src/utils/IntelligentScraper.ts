@@ -88,6 +88,12 @@ export class IntelligentScraper {
           method: 'firecrawl',
           cost: 0.01
         };
+        console.log('Firecrawl result in IntelligentScraper:', {
+          success: result.success,
+          hasData: !!result.data,
+          dataType: typeof result.data,
+          dataKeys: result.data ? Object.keys(result.data) : 'none'
+        });
       } else {
         const apifyResult = await ApifyService.scrapeWebsite(url);
         result = {

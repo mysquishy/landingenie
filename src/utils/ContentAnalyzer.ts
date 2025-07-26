@@ -39,6 +39,16 @@ export interface ProductData {
 
 export class ContentAnalyzer {
   static async analyzeContent(scrapedData: any): Promise<ProductData> {
+    console.log('ContentAnalyzer received data:', {
+      type: typeof scrapedData,
+      isNull: scrapedData === null,
+      isUndefined: scrapedData === undefined,
+      keys: scrapedData ? Object.keys(scrapedData) : 'none',
+      hasMarkdown: !!(scrapedData?.markdown),
+      hasMetadata: !!(scrapedData?.metadata),
+      markdownLength: scrapedData?.markdown?.length || 0
+    });
+
     // Handle undefined or null scrapedData
     if (!scrapedData || typeof scrapedData !== 'object') {
       console.warn('Invalid scraped data provided, using fallback analysis');

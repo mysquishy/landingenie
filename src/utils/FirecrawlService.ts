@@ -179,6 +179,13 @@ export class FirecrawlService {
       }
 
       // Handle case where Firecrawl succeeds but returns no data
+      console.log('Checking Firecrawl response data:', {
+        hasData: !!scrapeResponse.data,
+        dataType: typeof scrapeResponse.data,
+        dataKeys: scrapeResponse.data ? Object.keys(scrapeResponse.data) : 'none',
+        success: scrapeResponse.success
+      });
+
       if (!scrapeResponse.data) {
         console.log('Firecrawl succeeded but returned no data, using minimal fallback');
         const fallbackData = {
