@@ -222,21 +222,12 @@ export class FirecrawlService {
     }
 
     // Fallback: Standard scraping with enhanced configuration
+    console.log('Using standard scraping configuration...');
     return await this.firecrawlApp!.scrapeUrl(url, {
       formats: ['markdown', 'html'],
-      waitFor: 8000,
-      timeout: 20000,
       onlyMainContent: true,
-      includeTags: [
-        'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-        'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'ol',
-        'section', 'article', 'main', 'blockquote', 'strong', 
-        'em', 'b', 'i', 'form', 'input', 'textarea'
-      ],
-      excludeTags: [
-        'script', 'style', 'nav', 'footer', 'header', 'aside', 
-        'noscript', 'iframe', 'embed', 'object'
-      ]
+      waitFor: 3000,
+      timeout: 15000
     }) as any;
   }
 
