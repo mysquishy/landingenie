@@ -273,6 +273,14 @@ export class FirecrawlService {
       
       console.log('Affiliate page scraping completed:', result.success);
       console.log('FIRECRAWL AFFILIATE RESPONSE:', JSON.stringify(result, null, 2));
+      
+      // Log the actual content to debug
+      if (result.success && result.data) {
+        console.log('Markdown content length:', result.data.markdown?.length || 0);
+        console.log('HTML content length:', result.data.html?.length || 0);
+        console.log('Has metadata:', !!result.data.metadata);
+      }
+      
       return result;
     } catch (error) {
       console.error('Firecrawl affiliate scraping failed:', error);
@@ -303,6 +311,14 @@ export class FirecrawlService {
     }) as any;
 
     console.log('FIRECRAWL REGULAR RESPONSE:', JSON.stringify(response, null, 2));
+    
+    // Log the actual content to debug
+    if (response.success && response.data) {
+      console.log('Markdown content length:', response.data.markdown?.length || 0);
+      console.log('HTML content length:', response.data.html?.length || 0);
+      console.log('Has metadata:', !!response.data.metadata);
+    }
+    
     return response;
   }
 
