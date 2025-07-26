@@ -65,7 +65,7 @@ export class OpenRouterService {
           messages: [
             {
               role: 'system',
-              content: 'You are an expert at analyzing marketing content and extracting structured data. Always return valid JSON responses.'
+              content: 'You are an expert at analyzing marketing content and extracting structured data. For JSON responses, return valid JSON. For text responses, return plain text.'
             },
             {
               role: 'user',
@@ -87,7 +87,15 @@ export class OpenRouterService {
         throw new Error('No response from OpenRouter API');
       }
 
-      return JSON.parse(data.choices[0].message.content);
+      const content = data.choices[0].message.content;
+      
+      // Try to parse as JSON first, if it fails return as string
+      try {
+        return JSON.parse(content);
+      } catch {
+        // If JSON parsing fails, return the raw content
+        return content;
+      }
     } catch (error) {
       console.error('Error calling OpenRouter API:', error);
       throw error;
