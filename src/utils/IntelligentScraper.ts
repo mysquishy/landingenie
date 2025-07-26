@@ -115,6 +115,11 @@ export class IntelligentScraper {
           }
         } else {
           const firecrawlResult = await FirecrawlService.scrapeWebsite(url);
+          console.log('Firecrawl fallback result:', { 
+            success: firecrawlResult.success, 
+            hasData: !!firecrawlResult.data,
+            error: firecrawlResult.error 
+          });
           if (firecrawlResult.success) {
             result = {
               success: true,
