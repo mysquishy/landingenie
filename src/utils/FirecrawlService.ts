@@ -215,8 +215,8 @@ export class FirecrawlService {
       // First attempt: LLM extraction with structured data
       const llmResponse = await this.firecrawlApp!.scrapeUrl(url, {
         formats: ['json', 'markdown'],
-        jsonOptions: {
-          extractionPrompt: `Extract marketing elements from this sales/affiliate page:
+        extract: {
+          prompt: `Extract marketing elements from this sales/affiliate page:
 
 REQUIRED DATA:
 - productName: Exact product name (not generic terms)
@@ -233,16 +233,13 @@ REQUIRED DATA:
 
 Return as JSON with these exact keys. If information is not found, use empty array [] or empty string "".`
         },
-        pageOptions: {
-          waitFor: 8000, // Wait for redirects and JS loading
-          onlyMainContent: true,
-          includeHtml: true
-        },
+        waitFor: 8000,
+        onlyMainContent: true,
         timeout: 25000
       });
 
       if (llmResponse.success) {
-        return llmResponse as ScrapeResponse;
+        return llmResponse as any;
       }
     } catch (error) {
       console.warn('LLM extraction failed, trying fallback method:', error);
@@ -251,23 +248,20 @@ Return as JSON with these exact keys. If information is not found, use empty arr
     // Fallback: Standard scraping with enhanced configuration
     return await this.firecrawlApp!.scrapeUrl(url, {
       formats: ['markdown', 'html'],
-      pageOptions: {
-        waitFor: 8000,
-        timeout: 20000,
-        onlyMainContent: true,
-        includeHtml: true,
-        includeTags: [
-          'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-          'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'ol',
-          'section', 'article', 'main', 'blockquote', 'strong', 
-          'em', 'b', 'i', 'form', 'input', 'textarea'
-        ],
-        excludeTags: [
-          'script', 'style', 'nav', 'footer', 'header', 'aside', 
-          'noscript', 'iframe', 'embed', 'object'
-        ]
-      }
-    }) as Promise<FirecrawlResponse>;
+      waitFor: 8000,
+      timeout: 20000,
+      onlyMainContent: true,
+      includeTags: [
+        'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+        'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'ol',
+        'section', 'article', 'main', 'blockquote', 'strong', 
+        'em', 'b', 'i', 'form', 'input', 'textarea'
+      ],
+      excludeTags: [
+        'script', 'style', 'nav', 'footer', 'header', 'aside', 
+        'noscript', 'iframe', 'embed', 'object'
+      ]
+    }) as any;
   }
 
   private static async scrapeRegularPage(url: string): Promise<FirecrawlResponse> {
@@ -275,21 +269,19 @@ Return as JSON with these exact keys. If information is not found, use empty arr
     
     return await this.firecrawlApp!.scrapeUrl(url, {
       formats: ['markdown', 'html'],
-      pageOptions: {
-        waitFor: 3000,
-        timeout: 15000,
-        onlyMainContent: true,
-        includeTags: [
-          'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 
-          'article', 'main', 'blockquote', 'strong', 'em', 'b', 'i'
-        ],
-        excludeTags: [
-          'script', 'style', 'nav', 'footer', 'header', 'aside', 
-          'noscript', 'iframe'
-        ]
-      }
-    }) as Promise<FirecrawlResponse>;
+      waitFor: 3000,
+      timeout: 15000,
+      onlyMainContent: true,
+      includeTags: [
+        'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 
+        'article', 'main', 'blockquote', 'strong', 'em', 'b', 'i'
+      ],
+      excludeTags: [
+        'script', 'style', 'nav', 'footer', 'header', 'aside', 
+        'noscript', 'iframe'
+      ]
+    }) as any;
   }
 
   // ==================== CONTENT ANALYSIS ====================
