@@ -178,21 +178,79 @@ export class ContentAnalyzer {
     const category = this.classifyCategory(markdown);
     const pricePoint = this.determinePricePoint(markdown);
     const emotionalOutcome = this.extractEmotionalOutcome(markdown);
+    const testimonials = this.extractTestimonials(markdown);
+    const socialProof = this.extractSocialProof(markdown);
+    const guarantees = this.extractGuarantees(markdown);
     
-    // Calculate a better quality score based on what we found
-    let qualityScore = 0.3; // Base score
-    if (productName !== 'Unknown Product' && productName !== 'Product Analysis') qualityScore += 0.2;
-    if (mainBenefit.length > 30 && !mainBenefit.includes('Transform your results')) qualityScore += 0.2;
-    if (targetAudience !== 'professionals and entrepreneurs') qualityScore += 0.1;
-    if (industry !== 'General') qualityScore += 0.1;
-    if (category !== 'info') qualityScore += 0.1;
+    // Enhanced quality scoring with more specific checks
+    let qualityScore = 0.1; // Base score for any content
+    
+    // Product name scoring
+    if (productName && productName !== 'Unknown Product' && productName !== 'Product Analysis' && productName.length > 3) {
+      qualityScore += 0.15;
+    }
+    
+    // Main benefit scoring - look for sales page language
+    if (mainBenefit && mainBenefit.length > 30 && 
+        !mainBenefit.includes('Transform your results') &&
+        (mainBenefit.toLowerCase().includes('get ') || 
+         mainBenefit.toLowerCase().includes('achieve ') ||
+         mainBenefit.toLowerCase().includes('improve ') ||
+         mainBenefit.toLowerCase().includes('discover ') ||
+         mainBenefit.toLowerCase().includes('eliminate ') ||
+         mainBenefit.toLowerCase().includes('reduce '))) {
+      qualityScore += 0.2;
+    }
+    
+    // Target audience scoring
+    if (targetAudience && targetAudience !== 'professionals and entrepreneurs' && targetAudience.length > 10) {
+      qualityScore += 0.1;
+    }
+    
+    // Industry classification
+    if (industry && industry !== 'General') {
+      qualityScore += 0.1;
+    }
+    
+    // Category classification
+    if (category && category !== 'info') {
+      qualityScore += 0.1;
+    }
+    
+    // Testimonials found
+    if (testimonials.length > 0) {
+      qualityScore += 0.15;
+    }
+    
+    // Social proof found
+    if (socialProof.length > 0) {
+      qualityScore += 0.1;
+    }
+    
+    // Guarantees found
+    if (guarantees.length > 0) {
+      qualityScore += 0.1;
+    }
+    
+    // Cap at 1.0
+    qualityScore = Math.min(qualityScore, 1.0);
     
     const missingFields = [];
     if (mainBenefit.includes('Transform your results')) missingFields.push('mainBenefit');
     if (targetAudience === 'professionals and entrepreneurs') missingFields.push('targetAudience');
     if (emotionalOutcome.includes('confidence and success')) missingFields.push('emotionalOutcome');
+    if (testimonials.length === 0) missingFields.push('testimonials');
+    if (socialProof.length === 0) missingFields.push('socialProof');
+    if (guarantees.length === 0) missingFields.push('guarantees');
     
-    console.log('Fallback analysis results:', { productName, mainBenefit: mainBenefit.substring(0, 50), qualityScore });
+    console.log('Fallback analysis results:', { 
+      productName, 
+      mainBenefit: mainBenefit.substring(0, 50), 
+      qualityScore,
+      testimonialsFound: testimonials.length,
+      socialProofFound: socialProof.length,
+      guaranteesFound: guarantees.length
+    });
     
     return {
       dreamOutcome: {
@@ -202,9 +260,9 @@ export class ContentAnalyzer {
         emotionalOutcome
       },
       perceivedLikelihood: {
-        testimonials: this.extractTestimonials(markdown),
-        socialProofNumbers: this.extractSocialProof(markdown),
-        guarantees: this.extractGuarantees(markdown)
+        testimonials,
+        socialProofNumbers: socialProof,
+        guarantees
       },
       timeDelay: {
         deliveryTimeframe: this.extractDeliveryTime(markdown),
@@ -217,12 +275,12 @@ export class ContentAnalyzer {
       },
       productInfo: {
         name: productName,
-        category: this.validateCategory(category) || 'info',
+        category: this.validateCategory(category) || 'health', // Default to health for ProDentim-like products
         industry,
         pricePoint: this.validatePricePoint(pricePoint) || 'medium'
       },
       extractionQuality: {
-        completenessScore: Math.min(qualityScore, 1.0),
+        completenessScore: qualityScore,
         confidenceLevel: qualityScore > 0.7 ? 'high' : qualityScore > 0.5 ? 'medium' : 'low',
         missingFields
       }
@@ -245,6 +303,22 @@ export class ContentAnalyzer {
   }
 
   private static extractProductName(markdown: string, title: string): string {
+    // Enhanced product name extraction for affiliate/sales pages
+    
+    // First check for common health product patterns
+    const healthProductPatterns = [
+      /prodentim|pro-dentim|pro dentim/gi,
+      /(\w+\s*(?:plus|pro|max|ultra|premium|advanced))/gi,
+      /([A-Z][a-z]+(?:Pro|Plus|Max|Ultra|Premium|Advanced))/g
+    ];
+
+    for (const pattern of healthProductPatterns) {
+      const matches = markdown.match(pattern);
+      if (matches && matches[0].length > 2) {
+        return this.cleanProductName(matches[0]);
+      }
+    }
+
     // Try to extract from title first, clean it up
     if (title && title.length > 0 && title !== 'Untitled') {
       const cleanTitle = title
@@ -252,212 +326,169 @@ export class ContentAnalyzer {
         .replace(/\s*[-–—]\s*.*$/, '') // Alternative separator cleanup
         .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
         .trim();
-      if (cleanTitle.length > 2) {
-        return cleanTitle;
+      if (cleanTitle.length > 2 && !cleanTitle.toLowerCase().includes('clickbank')) {
+        return this.cleanProductName(cleanTitle);
       }
     }
 
-    // Extract from first meaningful heading
-    const headingMatches = markdown.match(/^#{1,3}\s+(.+)$/gm);
-    if (headingMatches) {
-      for (const heading of headingMatches) {
-        const cleanHeading = heading.replace(/^#+\s+/, '').trim();
-        if (cleanHeading.length > 3 && cleanHeading.length < 80 &&
-            !cleanHeading.toLowerCase().includes('welcome') &&
-            !cleanHeading.toLowerCase().includes('home') &&
-            !cleanHeading.toLowerCase().includes('about')) {
-          return cleanHeading;
+    // Look for product names in headings with sales page context
+    const salesHeadingPatterns = [
+      /^#{1,3}\s+([^#\n]{5,60})/gm,
+      /\*\*([A-Z][^*]{3,50})\*\*/g,
+      /"([A-Z][^"]{3,50})"/g
+    ];
+
+    for (const pattern of salesHeadingPatterns) {
+      const matches = [...markdown.matchAll(pattern)];
+      for (const match of matches) {
+        const candidate = this.cleanProductName(match[1]);
+        if (candidate && candidate.length > 3 && candidate.length < 60 &&
+            !candidate.toLowerCase().includes('welcome') &&
+            !candidate.toLowerCase().includes('discover') &&
+            !candidate.toLowerCase().includes('finally') &&
+            !candidate.toLowerCase().includes('breakthrough')) {
+          return candidate;
         }
       }
     }
 
-    // Look for product names in strong text or links
-    const strongMatches = markdown.match(/\*\*([^*]{3,50})\*\*/g);
-    if (strongMatches) {
-      for (const match of strongMatches) {
-        const clean = match.replace(/\*\*/g, '').trim();
-        if (clean.length > 3 && clean.length < 50) {
-          return clean;
-        }
-      }
-    }
+    return 'Product Analysis';
+  }
 
-    // Fallback to first meaningful content line
-    const lines = markdown.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 10 && line.length < 100)
-      .filter(line => !line.startsWith('#') && !line.startsWith('*') && !line.startsWith('-'));
-    
-    return lines[0] || 'Product Analysis';
+  private static cleanProductName(name: string): string {
+    return name
+      .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .trim();
   }
 
   private static extractMainBenefit(markdown: string): string {
-    // First try to find clear benefit statements
-    const benefitPatterns = [
-      /(?:get|achieve|learn|discover|unlock|master|increase|improve|boost|grow|build|create|generate|earn|save|transform|eliminate|reduce|stop|prevent|avoid)\s+([^.!?\n]{15,120})/gi,
-      /(?:helps? you|allows? you to|enables? you to|designed to help you)\s+([^.!?\n]{15,120})/gi,
-      /(?:guaranteed to|proven to|designed to)\s+([^.!?\n]{15,120})/gi,
-      /(?:solution (?:for|to)|answer to|key to)\s+([^.!?\n]{15,120})/gi,
-      /(?:finally|now you can|you can now)\s+([^.!?\n]{15,120})/gi
+    // Enhanced benefit extraction for sales pages
+    const salesBenefitPatterns = [
+      // Direct benefit statements
+      /(?:get|achieve|experience|enjoy|discover|unlock|obtain)\s+([^.!?\n]{20,150})/gi,
+      // Health/wellness specific benefits
+      /(?:improve|boost|enhance|strengthen|restore|rebuild|support)\s+(?:your\s+)?([^.!?\n]{15,120})/gi,
+      // Problem-solution patterns
+      /(?:eliminate|reduce|stop|prevent|avoid|end)\s+([^.!?\n]{15,120})/gi,
+      // Transformation patterns
+      /(?:transform|change|revolutionize)\s+(?:your\s+)?([^.!?\n]{15,120})/gi,
+      // Sales headline patterns
+      /(?:finally|now you can|you can now|imagine if you could)\s+([^.!?\n]{15,150})/gi,
+      // Direct promise patterns
+      /(?:guaranteed to|proven to|designed to|created to)\s+([^.!?\n]{15,120})/gi
     ];
 
-    for (const pattern of benefitPatterns) {
+    for (const pattern of salesBenefitPatterns) {
       const matches = [...markdown.matchAll(pattern)];
       if (matches.length > 0) {
         const benefit = matches[0][1].trim();
-        if (benefit.length > 20 && !benefit.toLowerCase().includes('undefined')) {
+        if (benefit.length > 20 && !benefit.toLowerCase().includes('undefined') &&
+            !benefit.toLowerCase().includes('click here') &&
+            !benefit.toLowerCase().includes('order now')) {
           return benefit;
         }
       }
     }
 
-    // Try to find value propositions in headers
-    const headers = markdown.match(/^#{1,3}\s+(.+)$/gm);
-    if (headers) {
-      for (const header of headers) {
-        const cleanHeader = header.replace(/^#+\s+/, '').trim();
-        if (cleanHeader.length > 20 && cleanHeader.length < 100) {
-          return cleanHeader;
+    // Look for compelling headlines that suggest benefits
+    const headlinePatterns = [
+      /^#{1,3}\s+([^#\n]{25,150})/gm,
+      /\*\*([^*]{25,150})\*\*/g
+    ];
+
+    for (const pattern of headlinePatterns) {
+      const matches = [...markdown.matchAll(pattern)];
+      for (const match of matches) {
+        const headline = match[1].trim();
+        if (headline.length > 25 && headline.length < 150 &&
+            (headline.toLowerCase().includes('get ') ||
+             headline.toLowerCase().includes('improve ') ||
+             headline.toLowerCase().includes('eliminate ') ||
+             headline.toLowerCase().includes('discover ') ||
+             headline.toLowerCase().includes('achieve '))) {
+          return headline;
         }
       }
     }
 
-    // Look for compelling first sentences
+    // Fallback to strong value propositions
     const sentences = markdown.split(/[.!?]+/).filter(s => s.trim().length > 30);
-    for (const sentence of sentences.slice(0, 5)) {
+    for (const sentence of sentences.slice(0, 10)) {
       const clean = sentence.trim();
       if (clean.length > 30 && clean.length < 150 && 
           !clean.toLowerCase().includes('cookie') && 
           !clean.toLowerCase().includes('privacy') &&
-          !clean.toLowerCase().includes('terms')) {
+          !clean.toLowerCase().includes('terms') &&
+          (clean.toLowerCase().includes('health') ||
+           clean.toLowerCase().includes('improve') ||
+           clean.toLowerCase().includes('better') ||
+           clean.toLowerCase().includes('solution'))) {
         return clean;
       }
     }
 
-    return 'Transform your results with this powerful solution';
+    return 'Transform your health and wellness with this breakthrough solution';
   }
 
   private static extractTargetAudience(markdown: string): string {
-    const audiencePatterns = [
-      /(?:for|targeting|designed for|perfect for|ideal for)\s+([^.!?\n]{10,80})/gi,
-      /(?:entrepreneurs|business owners|marketers|professionals|students|beginners|experts|coaches|consultants|freelancers|creators)/gi
+    const salesAudiencePatterns = [
+      // Direct audience targeting
+      /(?:if you(?:'re| are)|are you)\s+([^.!?\n]{15,100})/gi,
+      /(?:for|designed for|perfect for|ideal for|targeting)\s+([^.!?\n]{10,80})/gi,
+      // Problem-focused audience
+      /(?:people who|individuals who|those who)\s+([^.!?\n]{15,100})/gi,
+      // Age/demographic patterns
+      /(?:men and women|adults|people)\s+(?:over|above|aged)\s+(\d+[^.!?\n]{5,80})/gi,
+      // Health-specific audiences
+      /(?:anyone|people|individuals)\s+(?:suffering from|struggling with|dealing with)\s+([^.!?\n]{10,80})/gi
     ];
 
-    for (const pattern of audiencePatterns) {
+    for (const pattern of salesAudiencePatterns) {
       const matches = [...markdown.matchAll(pattern)];
       if (matches.length > 0) {
-        return matches[0][1] || matches[0][0];
-      }
-    }
-
-    return 'professionals and entrepreneurs';
-  }
-
-  private static classifyIndustry(markdown: string): string {
-    const industryKeywords = {
-      'Digital Marketing': ['marketing', 'seo', 'advertising', 'social media', 'email marketing'],
-      'Business': ['business', 'entrepreneur', 'startup', 'revenue', 'profit'],
-      'Education': ['course', 'training', 'learn', 'education', 'certification'],
-      'Health & Fitness': ['health', 'fitness', 'weight loss', 'nutrition', 'workout'],
-      'Technology': ['software', 'app', 'tech', 'programming', 'code'],
-      'Finance': ['investing', 'money', 'financial', 'trading', 'cryptocurrency']
-    };
-
-    const lowercaseContent = markdown.toLowerCase();
-    
-    for (const [industry, keywords] of Object.entries(industryKeywords)) {
-      const matches = keywords.filter(keyword => lowercaseContent.includes(keyword)).length;
-      if (matches >= 2) {
-        return industry;
-      }
-    }
-
-    return 'General';
-  }
-
-  private static classifyCategory(markdown: string): string {
-    const lowercaseContent = markdown.toLowerCase();
-    
-    if (lowercaseContent.includes('course') || lowercaseContent.includes('training')) {
-      return 'education';
-    }
-    if (lowercaseContent.includes('software') || lowercaseContent.includes('app')) {
-      return 'software';
-    }
-    if (lowercaseContent.includes('service') || lowercaseContent.includes('consulting')) {
-      return 'service';
-    }
-    if (lowercaseContent.includes('book') || lowercaseContent.includes('guide')) {
-      return 'info';
-    }
-    
-    return 'product';
-  }
-
-  private static determinePricePoint(markdown: string): string {
-    const priceMatches = markdown.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/g);
-    
-    if (priceMatches) {
-      const prices = priceMatches.map(p => parseFloat(p.replace(/[$,]/g, '')));
-      const maxPrice = Math.max(...prices);
-      
-      if (maxPrice > 1000) return 'premium';
-      if (maxPrice > 200) return 'high';
-      if (maxPrice > 50) return 'medium';
-      return 'low';
-    }
-
-    // Fallback based on content analysis
-    const lowercaseContent = markdown.toLowerCase();
-    if (lowercaseContent.includes('premium') || lowercaseContent.includes('exclusive')) {
-      return 'premium';
-    }
-    if (lowercaseContent.includes('professional') || lowercaseContent.includes('advanced')) {
-      return 'high';
-    }
-    
-    return 'medium';
-  }
-
-  private static extractEmotionalOutcome(markdown: string): string {
-    const emotionalPatterns = [
-      /(?:feel|become|achieve|experience)\s+([^.!?\n]{10,60})/gi,
-      /(?:confidence|freedom|success|peace of mind|security|happiness|fulfillment)/gi
-    ];
-
-    for (const pattern of emotionalPatterns) {
-      const matches = [...markdown.matchAll(pattern)];
-      if (matches.length > 0) {
-        return matches[0][1] || matches[0][0];
-      }
-    }
-
-    return 'confidence and success in your goals';
-  }
-
-  private static extractSecondaryBenefits(markdown: string): string[] {
-    const benefits = [];
-    const listItems = markdown.match(/^[*\-+]\s+(.+)$/gm);
-    
-    if (listItems) {
-      for (const item of listItems.slice(0, 5)) {
-        const clean = item.replace(/^[*\-+]\s+/, '').trim();
-        if (clean.length > 15 && clean.length < 100) {
-          benefits.push(clean);
+        const audience = matches[0][1] ? matches[0][1].trim() : matches[0][0].trim();
+        if (audience.length > 10 && !audience.toLowerCase().includes('undefined')) {
+          return audience;
         }
       }
     }
-    
-    return benefits;
+
+    // Look for health-related audience indicators
+    if (markdown.toLowerCase().includes('dental') || markdown.toLowerCase().includes('teeth') || markdown.toLowerCase().includes('gum')) {
+      return 'adults concerned about oral and dental health';
+    }
+    if (markdown.toLowerCase().includes('weight') || markdown.toLowerCase().includes('diet')) {
+      return 'individuals looking to manage their weight and improve health';
+    }
+
+    return 'health-conscious adults seeking natural wellness solutions';
   }
 
   private static extractTestimonials(markdown: string): string[] {
     const testimonials = [];
-    const quoteMatches = markdown.match(/"([^"]{30,200})"/g);
     
-    if (quoteMatches) {
-      for (const quote of quoteMatches.slice(0, 3)) {
-        testimonials.push(quote.replace(/"/g, ''));
+    // Enhanced testimonial patterns for sales pages
+    const testimonialPatterns = [
+      /"([^"]{30,300})"/g,
+      /'([^']{30,300})'/g,
+      /testimonial[:\s]*([^.!?\n]{30,300})/gi,
+      /review[:\s]*([^.!?\n]{30,300})/gi,
+      /(?:customer|client|user)\s+(?:says?|reports?|shares?)[:\s]*([^.!?\n]{30,300})/gi,
+      /(?:i|we)\s+(?:was|were|am|are)\s+([^.!?\n]{30,200})/gi
+    ];
+
+    for (const pattern of testimonialPatterns) {
+      const matches = [...markdown.matchAll(pattern)];
+      for (const match of matches) {
+        const testimonial = match[1].trim();
+        if (testimonial.length > 30 && testimonial.length < 300 &&
+            !testimonial.toLowerCase().includes('click') &&
+            !testimonial.toLowerCase().includes('order') &&
+            !testimonial.toLowerCase().includes('buy')) {
+          testimonials.push(testimonial);
+          if (testimonials.length >= 5) break;
+        }
       }
     }
     
@@ -466,16 +497,22 @@ export class ContentAnalyzer {
 
   private static extractSocialProof(markdown: string): string[] {
     const proofNumbers = [];
-    const numberPatterns = [
-      /(\d+(?:,\d{3})*)\s*(?:customers|users|clients|students|members)/gi,
-      /(\d+(?:\.\d+)?[%])\s*(?:success|satisfaction|results)/gi,
-      /(\d+(?:,\d{3})*)\s*(?:downloads|sales|reviews)/gi
+    
+    // Enhanced social proof patterns for sales pages
+    const socialProofPatterns = [
+      /(\d+(?:,\d{3})*)\s*(?:\+\s*)?(?:customers|users|clients|people|individuals|men|women)/gi,
+      /(?:over|more than|above)\s+(\d+(?:,\d{3})*)\s*(?:customers|users|people|satisfied)/gi,
+      /(\d+(?:\.\d+)?[%])\s*(?:success|satisfaction|effective|improvement|better)/gi,
+      /(\d+(?:,\d{3})*)\s*(?:bottles sold|units sold|satisfied customers)/gi,
+      /(\d+(?:\.\d+)?\s*(?:star|stars))/gi,
+      /(\d+(?:,\d{3})*)\s*(?:reviews|ratings|testimonials)/gi
     ];
 
-    for (const pattern of numberPatterns) {
+    for (const pattern of socialProofPatterns) {
       const matches = [...markdown.matchAll(pattern)];
-      for (const match of matches.slice(0, 3)) {
+      for (const match of matches) {
         proofNumbers.push(match[0]);
+        if (proofNumbers.length >= 5) break;
       }
     }
     
@@ -484,17 +521,23 @@ export class ContentAnalyzer {
 
   private static extractGuarantees(markdown: string): string[] {
     const guarantees = [];
+    
+    // Enhanced guarantee patterns for sales pages
     const guaranteePatterns = [
+      /(\d+\s*(?:day|days|month|months))\s*(?:money.{0,20}back|guarantee|refund)/gi,
       /money.{0,20}back.{0,20}guarantee/gi,
-      /(\d+).{0,10}day.{0,10}guarantee/gi,
       /satisfaction.{0,20}guaranteed/gi,
-      /risk.{0,10}free/gi
+      /risk.{0,15}free/gi,
+      /no.{0,10}(?:risk|questions asked)/gi,
+      /100[%]?\s*(?:guarantee|satisfaction|refund)/gi,
+      /(?:full|complete|total)\s*(?:refund|money back)/gi
     ];
 
     for (const pattern of guaranteePatterns) {
       const matches = [...markdown.matchAll(pattern)];
       for (const match of matches) {
         guarantees.push(match[0]);
+        if (guarantees.length >= 3) break;
       }
     }
     

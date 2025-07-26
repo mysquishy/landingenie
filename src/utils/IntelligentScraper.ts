@@ -1,3 +1,4 @@
+
 import { FirecrawlService } from './FirecrawlService';
 import { ApifyService } from './ApifyService';
 
@@ -14,6 +15,7 @@ interface ScrapingResult {
 interface URLAnalysis {
   domain: string;
   isComplex: boolean;
+  isAffiliate: boolean;
   recommendedService: 'firecrawl' | 'apify';
   reasoning: string;
 }
@@ -28,15 +30,34 @@ export class IntelligentScraper {
       'samcart.com', 'thrivecart.com', 'gumroad.com'
     ];
     
+    const affiliateNetworks = [
+      'clickbank.net', 'hop.clickbank.net', 'jvzoo.com', 'warriorplus.com',
+      'commission-junction.com', 'cj.com', 'linkshare.com', 'shareasale.com'
+    ];
+    
     const isComplex = complexPlatforms.some(platform => domain.includes(platform));
+    const isAffiliate = affiliateNetworks.some(network => domain.includes(network)) || 
+                       url.includes('affiliate') || url.includes('?hop=') || 
+                       url.includes('cbpage=') || url.includes('vendor=');
+    
+    // Prefer Apify for affiliate networks and complex sales pages
+    const recommendedService = (isAffiliate || isComplex) ? 'apify' : 'firecrawl';
+    
+    let reasoning = '';
+    if (isAffiliate) {
+      reasoning = 'Affiliate URL detected, using advanced extraction for sales pages';
+    } else if (isComplex) {
+      reasoning = 'Complex platform detected, needs full browser rendering';
+    } else {
+      reasoning = 'Standard landing page, content extraction sufficient';
+    }
     
     return {
       domain,
       isComplex,
-      recommendedService: isComplex ? 'apify' : 'firecrawl',
-      reasoning: isComplex 
-        ? 'Complex platform detected, needs full browser rendering' 
-        : 'Standard landing page, content extraction sufficient'
+      isAffiliate,
+      recommendedService,
+      reasoning
     };
   }
 
@@ -125,6 +146,31 @@ export class IntelligentScraper {
   private static calculateQualityScore(data: any): number {
     if (!data) return 0;
 
+    let score = 0;
+
+    // For Apify data structure (enhanced scoring)
+    if (data.headlines || data.testimonials || data.benefits) {
+      const headlines = data.headlines || [];
+      const testimonials = data.testimonials || [];
+      const benefits = data.benefits || [];
+      const ctas = data.ctas || [];
+      const pricing = data.pricing || [];
+      const guarantees = data.guarantees || [];
+      const socialProof = data.socialProof || [];
+      const productName = data.productName || '';
+
+      score += (headlines.length > 0 ? 0.15 : 0);
+      score += (testimonials.length > 0 ? 0.2 : 0);
+      score += (benefits.length > 3 ? 0.2 : benefits.length > 0 ? 0.1 : 0);
+      score += (ctas.length > 0 ? 0.1 : 0);
+      score += (pricing.length > 0 ? 0.1 : 0);
+      score += (guarantees.length > 0 ? 0.15 : 0);
+      score += (socialProof.length > 0 ? 0.05 : 0);
+      score += (productName && productName.length > 3 ? 0.05 : 0);
+
+      return Math.min(score, 1.0);
+    }
+
     // For Firecrawl data structure
     if (data.markdown || data.metadata) {
       const hasTitle = !!(data.metadata?.title || data.title);
@@ -138,36 +184,27 @@ export class IntelligentScraper {
       );
     }
 
-    // For Apify data structure
-    const headlines = data.headlines || [];
-    const testimonials = data.testimonials || [];
-    const benefits = data.benefits || [];
-    const ctas = data.ctas || [];
-    const pricing = data.pricing || [];
-
-    return (
-      (headlines.length > 0 ? 0.25 : 0) +
-      (testimonials.length > 0 ? 0.2 : 0) +
-      (benefits.length > 2 ? 0.25 : 0) +
-      (ctas.length > 0 ? 0.15 : 0) +
-      (pricing.length > 0 ? 0.15 : 0)
-    );
+    return 0.1; // Minimum score for any data
   }
 
   static validateDataQuality(data: any) {
     const score = this.calculateQualityScore(data);
     
+    const missing = {
+      headlines: !data.headlines || data.headlines.length === 0,
+      testimonials: !data.testimonials || data.testimonials.length === 0,
+      benefits: !data.benefits || data.benefits.length < 3,
+      ctas: !data.ctas || data.ctas.length === 0,
+      pricing: !data.pricing || data.pricing.length === 0,
+      guarantees: !data.guarantees || data.guarantees.length === 0,
+      socialProof: !data.socialProof || data.socialProof.length === 0
+    };
+    
     return {
       score,
       isGood: score > 0.6,
       isComplete: score > 0.8,
-      missing: {
-        headlines: !data.headlines || data.headlines.length === 0,
-        testimonials: !data.testimonials || data.testimonials.length === 0,
-        benefits: !data.benefits || data.benefits.length < 3,
-        ctas: !data.ctas || data.ctas.length === 0,
-        pricing: !data.pricing || data.pricing.length === 0
-      }
+      missing
     };
   }
 }
