@@ -57,8 +57,11 @@ export class FirecrawlService {
 
       const scrapeResponse = await this.firecrawlApp.scrapeUrl(url, {
         formats: ['markdown', 'html'],
-        includeTags: ['title', 'meta', 'h1', 'h2', 'h3', 'p', 'div', 'span', 'button', 'a'],
-        excludeTags: ['script', 'style', 'nav', 'footer', 'header']
+        includeTags: ['title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 'article', 'main', 'blockquote', 'strong', 'em', 'b', 'i'],
+        excludeTags: ['script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript', 'iframe'],
+        waitFor: 3000,
+        timeout: 15000,
+        onlyMainContent: true
       }) as FirecrawlResponse;
 
       if (!scrapeResponse.success) {
