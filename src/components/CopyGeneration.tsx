@@ -379,10 +379,10 @@ Return only the guarantee text.`
                 <div>
                   <label className="text-sm font-medium">Key Benefits</label>
                   <div className="space-y-2 mt-2">
-                    {generatedCopy.benefits.map((benefit, index) => (
+                    {Array.isArray(generatedCopy.benefits) && generatedCopy.benefits.map((benefit, index) => (
                       <Textarea
                         key={index}
-                        value={benefit}
+                        value={typeof benefit === 'string' ? benefit : String(benefit)}
                         onChange={(e) => {
                           const newBenefits = [...generatedCopy.benefits];
                           newBenefits[index] = e.target.value;
@@ -436,10 +436,10 @@ Return only the guarantee text.`
                 <div>
                   <label className="text-sm font-medium">Objection Handling</label>
                   <div className="space-y-2 mt-2">
-                    {generatedCopy.objectionHandling.map((objection, index) => (
+                    {Array.isArray(generatedCopy.objectionHandling) && generatedCopy.objectionHandling.map((objection, index) => (
                       <Textarea
                         key={index}
-                        value={objection}
+                        value={typeof objection === 'string' ? objection : String(objection)}
                         onChange={(e) => {
                           const newObjections = [...generatedCopy.objectionHandling];
                           newObjections[index] = e.target.value;
