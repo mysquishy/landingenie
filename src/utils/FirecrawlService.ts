@@ -72,8 +72,10 @@ export class FirecrawlService {
   // ==================== API KEY MANAGEMENT ====================
 
   static saveApiKey(apiKey: string): void {
+    console.log('Saving Firecrawl API key:', apiKey.substring(0, 10) + '...');
     localStorage.setItem(this.API_KEY_STORAGE_KEY, apiKey);
     this.firecrawlApp = new FirecrawlApp({ apiKey });
+    console.log('Firecrawl API key saved and initialized');
   }
 
   static getApiKey(): string | null {
