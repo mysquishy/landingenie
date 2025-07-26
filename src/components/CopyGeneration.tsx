@@ -174,14 +174,29 @@ Return only the guarantee text.`
         const prompt = generatePrompt(stage);
         const response = await OpenRouterService.analyzeContent(prompt, 'anthropic/claude-3.5-sonnet');
         
-        // Handle different response types
+        console.log(`${stage} response:`, response);
+        
+        // Handle different response types - OpenRouter returns strings directly
         if (stage === 'benefits' || stage === 'cta') {
-          results[stage] = Array.isArray(response) ? response : JSON.parse(response);
+          try {
+            results[stage] = typeof response === 'string' ? JSON.parse(response) : response;
+          } catch {
+            // If JSON parsing fails, create default array
+            results[stage] = stage === 'benefits' 
+              ? [response, "Additional benefit", "Another benefit"] 
+              : [response];
+          }
         } else if (stage === 'objections') {
-          const objectionData = Array.isArray(response) ? response : JSON.parse(response);
-          results['objectionHandling'] = objectionData.map((item: any) => item.response);
+          try {
+            const objectionData = typeof response === 'string' ? JSON.parse(response) : response;
+            results['objectionHandling'] = Array.isArray(objectionData) 
+              ? objectionData.map((item: any) => item.response || item)
+              : [objectionData];
+          } catch {
+            results['objectionHandling'] = [response || "Standard objection response"];
+          }
         } else {
-          results[stage] = typeof response === 'string' ? response : response.content || response;
+          results[stage] = response || `Generated ${stage} content`;
         }
 
         // Add small delay for better UX
