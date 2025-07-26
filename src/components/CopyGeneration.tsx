@@ -179,7 +179,14 @@ Return only the guarantee text.`
         // Handle different response types - OpenRouter returns strings directly
         if (stage === 'benefits' || stage === 'cta') {
           try {
-            results[stage] = typeof response === 'string' ? JSON.parse(response) : response;
+            const parsed = typeof response === 'string' ? JSON.parse(response) : response;
+            if (stage === 'cta') {
+              // Handle CTA response structure: {"cta_options": [...]} or direct array
+              results[stage] = parsed.cta_options || (Array.isArray(parsed) ? parsed : [parsed]);
+            } else {
+              // Handle benefits
+              results[stage] = Array.isArray(parsed) ? parsed : [parsed];
+            }
           } catch {
             // If JSON parsing fails, create default array
             results[stage] = stage === 'benefits' 
@@ -189,9 +196,11 @@ Return only the guarantee text.`
         } else if (stage === 'objections') {
           try {
             const objectionData = typeof response === 'string' ? JSON.parse(response) : response;
-            results['objectionHandling'] = Array.isArray(objectionData) 
-              ? objectionData.map((item: any) => item.response || item)
-              : [objectionData];
+            // Handle objections response structure: {"objections": [{objection, response}, ...]} or direct array
+            const objections = objectionData.objections || objectionData;
+            results['objectionHandling'] = Array.isArray(objections) 
+              ? objections.map((item: any) => item.response || item)
+              : [objections];
           } catch {
             results['objectionHandling'] = [response || "Standard objection response"];
           }
