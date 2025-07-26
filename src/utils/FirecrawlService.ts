@@ -154,6 +154,7 @@ export class FirecrawlService {
 
     try {
       if (!this.firecrawlApp) {
+        console.log('Initializing Firecrawl with API key...');
         this.firecrawlApp = new FirecrawlApp({ apiKey });
       }
 
