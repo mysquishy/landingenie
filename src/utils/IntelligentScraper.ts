@@ -83,7 +83,7 @@ export class IntelligentScraper {
         const firecrawlResult = await FirecrawlService.scrapeWebsite(url);
         result = {
           success: firecrawlResult.success,
-          data: firecrawlResult.data,
+          data: firecrawlResult.data?.raw || firecrawlResult.data,
           error: firecrawlResult.error,
           method: 'firecrawl',
           cost: 0.01
@@ -123,7 +123,7 @@ export class IntelligentScraper {
           if (firecrawlResult.success) {
             result = {
               success: true,
-              data: firecrawlResult.data,
+              data: firecrawlResult.data?.raw || firecrawlResult.data,
               method: 'firecrawl-fallback',
               cost: 0.01
             };
