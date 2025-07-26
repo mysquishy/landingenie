@@ -174,10 +174,10 @@ export class ContentAnalyzer {
     const productName = this.extractProductName(markdown, metadata.title);
     const mainBenefit = this.extractMainBenefit(markdown);
     const targetAudience = this.extractTargetAudience(markdown);
-    const industry = this.classifyIndustry(markdown);
-    const category = this.classifyCategory(markdown);
-    const pricePoint = this.determinePricePoint(markdown);
-    const emotionalOutcome = this.extractEmotionalOutcome(markdown);
+    const industry = 'Health & Wellness'; // Default for affiliate products
+    const category = 'health'; // Default for affiliate products
+    const pricePoint = 'medium'; // Default pricing
+    const emotionalOutcome = 'improved confidence and well-being';
     const testimonials = this.extractTestimonials(markdown);
     const socialProof = this.extractSocialProof(markdown);
     const guarantees = this.extractGuarantees(markdown);
@@ -207,15 +207,11 @@ export class ContentAnalyzer {
       qualityScore += 0.1;
     }
     
-    // Industry classification
-    if (industry && industry !== 'General') {
-      qualityScore += 0.1;
-    }
+    // Industry classification - always health for affiliate products
+    qualityScore += 0.1;
     
-    // Category classification
-    if (category && category !== 'info') {
-      qualityScore += 0.1;
-    }
+    // Category classification - always health for affiliate products
+    qualityScore += 0.1;
     
     // Testimonials found
     if (testimonials.length > 0) {
@@ -255,7 +251,7 @@ export class ContentAnalyzer {
     return {
       dreamOutcome: {
         mainBenefit,
-        secondaryBenefits: this.extractSecondaryBenefits(markdown),
+        secondaryBenefits: [], // Will be extracted from benefits
         targetAudience,
         emotionalOutcome
       },
