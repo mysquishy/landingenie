@@ -477,6 +477,13 @@ export class FirecrawlService {
           }
         ]
       }) as any;
+
+      // Right after: const result = await this.firecrawlApp!.scrapeUrl(...)
+      console.log('=== IMMEDIATE RESPONSE CHECK ===');
+      console.log('Type of result:', typeof result);
+      console.log('Result keys:', result ? Object.keys(result) : 'null');
+      console.log('Raw result:', JSON.stringify(result, null, 2).substring(0, 1000));
+      console.log('=== END IMMEDIATE CHECK ===');
       
       console.log('Affiliate page scraping completed:', result.success);
       console.log('FIRECRAWL AFFILIATE RESPONSE:', JSON.stringify(result, null, 2));
