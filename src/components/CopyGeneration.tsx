@@ -184,8 +184,8 @@ Return only the guarantee text.`
               // Handle CTA response structure: {"cta_options": [...]} or direct array
               results[stage] = parsed.cta_options || (Array.isArray(parsed) ? parsed : [parsed]);
             } else {
-              // Handle benefits
-              results[stage] = Array.isArray(parsed) ? parsed : [parsed];
+              // Handle benefits response structure: {"benefits": [...]} or direct array
+              results[stage] = parsed.benefits || (Array.isArray(parsed) ? parsed : [parsed]);
             }
           } catch {
             // If JSON parsing fails, create default array
