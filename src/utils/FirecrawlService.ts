@@ -379,14 +379,17 @@ export class FirecrawlService {
       }
 
       // Handle case where Firecrawl succeeds but returns no data
+      // Firecrawl returns data directly on response object, not nested under 'data'
+      const hasContent = !!(scrapeResponse as any).markdown || !!(scrapeResponse as any).html;
       console.log('Checking Firecrawl response data:', {
-        hasData: !!scrapeResponse.data,
-        dataType: typeof scrapeResponse.data,
-        dataKeys: scrapeResponse.data ? Object.keys(scrapeResponse.data) : 'none',
+        hasMarkdown: !!(scrapeResponse as any).markdown,
+        hasHtml: !!(scrapeResponse as any).html,
+        markdownLength: (scrapeResponse as any).markdown?.length || 0,
+        htmlLength: (scrapeResponse as any).html?.length || 0,
         success: scrapeResponse.success
       });
 
-      if (!scrapeResponse.data) {
+      if (!hasContent) {
         console.log('Firecrawl succeeded but returned no data, using minimal fallback');
         const fallbackData = {
           markdown: 'No content extracted',
@@ -415,36 +418,53 @@ export class FirecrawlService {
             }
           }
         };
-      }
-
-      // Analyze and structure the content
-      const analyzed = await this.analyzeScrapedContent(
-        scrapeResponse.data, 
-        urlAnalysis.isAffiliatePage
-      );
-
-      const processingTime = Date.now() - startTime;
-
-      const result = { 
-        success: true,
-        data: {
-          raw: scrapeResponse.data,
-          analyzed,
-          metadata: {
-            processingTime,
-            finalURL: scrapeResponse.data.metadata.sourceURL || url,
-            isAffiliatePage: urlAnalysis.isAffiliatePage,
-            extractionMethod: analyzed.extractionMethod
+      } else {
+        // Normalize the response for the rest of the code that expects nested structure
+        const normalizedData = {
+          markdown: (scrapeResponse as any).markdown,
+          html: (scrapeResponse as any).html,
+          metadata: (scrapeResponse as any).metadata || {
+            title: '',
+            description: '',
+            sourceURL: url
           }
-        }
-      } as ScrapingResult;
+        };
+        
+        console.log('Normalized Firecrawl data:', {
+          markdownLength: normalizedData.markdown?.length || 0,
+          htmlLength: normalizedData.html?.length || 0,
+          hasMetadata: !!normalizedData.metadata
+        });
+
+        // Analyze and structure the content
+        const analyzed = await this.analyzeScrapedContent(
+          normalizedData, 
+          urlAnalysis.isAffiliatePage
+        );
+
+        const processingTime = Date.now() - startTime;
+
+        const result = { 
+          success: true,
+          data: {
+            raw: normalizedData,
+            analyzed,
+            metadata: {
+              processingTime,
+              finalURL: normalizedData.metadata.sourceURL || url,
+              isAffiliatePage: urlAnalysis.isAffiliatePage,
+              extractionMethod: analyzed.extractionMethod
+            }
+          }
+        } as ScrapingResult;
       
       // Cache successful result
       if (useCache) {
         this.setCachedResult(url, result);
       }
       
-      return result;
+        return result;
+      }
 
     } catch (error) {
       console.error('Error during scraping:', error);
@@ -488,11 +508,11 @@ export class FirecrawlService {
       console.log('Affiliate page scraping completed:', result.success);
       console.log('FIRECRAWL AFFILIATE RESPONSE:', JSON.stringify(result, null, 2));
       
-      // Log the actual content to debug
-      if (result.success && result.data) {
-        console.log('Markdown content length:', result.data.markdown?.length || 0);
-        console.log('HTML content length:', result.data.html?.length || 0);
-        console.log('Has metadata:', !!result.data.metadata);
+      // Log the actual content to debug (Firecrawl returns data directly)
+      if (result.success) {
+        console.log('Markdown content length:', result.markdown?.length || 0);
+        console.log('HTML content length:', result.html?.length || 0);
+        console.log('Has metadata:', !!result.metadata);
       }
       
       return result;
@@ -526,11 +546,11 @@ export class FirecrawlService {
 
     console.log('FIRECRAWL REGULAR RESPONSE:', JSON.stringify(response, null, 2));
     
-    // Log the actual content to debug
-    if (response.success && response.data) {
-      console.log('Markdown content length:', response.data.markdown?.length || 0);
-      console.log('HTML content length:', response.data.html?.length || 0);
-      console.log('Has metadata:', !!response.data.metadata);
+    // Log the actual content to debug (Firecrawl returns data directly)
+    if (response.success) {
+      console.log('Markdown content length:', response.markdown?.length || 0);
+      console.log('HTML content length:', response.html?.length || 0);
+      console.log('Has metadata:', !!response.metadata);
     }
     
     return response;
