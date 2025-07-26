@@ -2,6 +2,21 @@ import FirecrawlApp from '@mendable/firecrawl-js';
 
 // ==================== INTERFACES ====================
 
+interface ScrapingConfig {
+  timeout: number;
+  waitFor: number;
+  maxRetries: number;
+  enableCache: boolean;
+  affiliateTimeout: number;
+  affiliateWaitFor: number;
+}
+
+interface UrlValidationResult {
+  isValid: boolean;
+  error?: string;
+  suggestions?: string[];
+}
+
 interface ErrorResponse {
   success: false;
   error: string;
@@ -68,6 +83,53 @@ type FirecrawlResponse = ScrapeResponse | ErrorResponse;
 export class FirecrawlService {
   private static API_KEY_STORAGE_KEY = 'firecrawl_api_key';
   private static firecrawlApp: FirecrawlApp | null = null;
+  
+  // ==================== CACHING & CONFIGURATION ====================
+  
+  private static cache = new Map<string, ScrapingResult>();
+  private static readonly CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+  private static cacheTimestamps = new Map<string, number>();
+  
+  private static config: ScrapingConfig = {
+    timeout: 15000,
+    waitFor: 3000,
+    maxRetries: 3,
+    enableCache: true,
+    affiliateTimeout: 30000,
+    affiliateWaitFor: 10000
+  };
+  
+  // Enhanced pattern recognition
+  private static readonly ENHANCED_PATTERNS = {
+    pricing: [
+      /(?:only|just|starting at|from)\s*\$(\d+(?:\.\d{2})?)/i,
+      /(\d+(?:\.\d{2})?)\s*(?:dollars?|usd|€|£)/i,
+      /save\s+(\d+%|\$\d+)/i,
+      /(?:price|cost|fee|charge).*?\$?(\d+(?:\.\d{2})?)/i,
+      /\$(\d+(?:\.\d{2})?)(?:\s*(?:per|\/|month|year|day))?/i
+    ],
+    urgency: [
+      /limited time/i,
+      /act now/i,
+      /expires (?:soon|today|tomorrow)/i,
+      /only \d+ left/i,
+      /hurry(?:\s*up)?/i,
+      /don't miss out/i,
+      /while supplies last/i
+    ],
+    testimonials: [
+      /"([^"]{20,200})"/,
+      /testimonial/i,
+      /review/i,
+      /customer says?/i,
+      /(?:★|⭐|stars?)\s*\d/i
+    ],
+    guarantees: [
+      /(?:\d+[-\s]*(?:day|week|month|year)?\s*)?(?:money[-\s]*back|satisfaction|guarantee)/i,
+      /risk[-\s]*free/i,
+      /(?:no questions asked|full refund)/i
+    ]
+  };
 
   // ==================== API KEY MANAGEMENT ====================
 
@@ -99,6 +161,109 @@ export class FirecrawlService {
   static removeApiKey(): void {
     localStorage.removeItem(this.API_KEY_STORAGE_KEY);
     this.firecrawlApp = null;
+  }
+  
+  // ==================== CONFIGURATION MANAGEMENT ====================
+  
+  static updateConfig(newConfig: Partial<ScrapingConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    console.log('Updated scraping configuration:', this.config);
+  }
+  
+  static getConfig(): ScrapingConfig {
+    return { ...this.config };
+  }
+  
+  // ==================== ENHANCED URL VALIDATION ====================
+  
+  static async validateUrl(url: string): Promise<UrlValidationResult> {
+    try {
+      const urlObj = new URL(url);
+      
+      // Check for common issues
+      const suggestions: string[] = [];
+      if (!urlObj.protocol.startsWith('http')) {
+        suggestions.push('URL should start with http:// or https://');
+      }
+      
+      // Test actual connectivity with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const response = await fetch(url, { 
+          method: 'HEAD', 
+          signal: controller.signal,
+          mode: 'no-cors' // Changed from 'cors' to avoid CORS issues
+        });
+        clearTimeout(timeoutId);
+        
+        return { isValid: true, suggestions };
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        // If HEAD fails, the URL might still be scrapable by Firecrawl
+        return { 
+          isValid: true, // Allow Firecrawl to try
+          suggestions: ['URL might have CORS restrictions but should be scrapable'],
+          error: `Connectivity test failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`
+        };
+      }
+    } catch (error) {
+      return { 
+        isValid: false, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        suggestions: ['Check URL format', 'Verify site is accessible', 'Ensure URL starts with http:// or https://']
+      };
+    }
+  }
+  
+  // ==================== CACHING METHODS ====================
+  
+  private static getCacheKey(url: string): string {
+    return url.toLowerCase().trim();
+  }
+  
+  private static isCacheValid(key: string): boolean {
+    if (!this.config.enableCache) return false;
+    
+    const timestamp = this.cacheTimestamps.get(key);
+    if (!timestamp) return false;
+    
+    return Date.now() - timestamp < this.CACHE_TTL;
+  }
+  
+  private static getCachedResult(url: string): ScrapingResult | null {
+    const key = this.getCacheKey(url);
+    if (this.isCacheValid(key)) {
+      const cached = this.cache.get(key);
+      if (cached) {
+        console.log('Returning cached result for:', url);
+        return cached;
+      }
+    }
+    return null;
+  }
+  
+  private static setCachedResult(url: string, result: ScrapingResult): void {
+    if (!this.config.enableCache || !result.success) return;
+    
+    const key = this.getCacheKey(url);
+    this.cache.set(key, result);
+    this.cacheTimestamps.set(key, Date.now());
+    
+    // Clean old cache entries (simple LRU)
+    if (this.cache.size > 100) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+      this.cacheTimestamps.delete(oldestKey);
+    }
+  }
+  
+  static clearCache(): void {
+    this.cache.clear();
+    this.cacheTimestamps.clear();
+    console.log('Cache cleared');
   }
 
   // ==================== URL ANALYSIS ====================
@@ -143,10 +308,25 @@ export class FirecrawlService {
 
   // ==================== MAIN SCRAPING METHOD ====================
 
-  static async scrapeWebsite(url: string): Promise<ScrapingResult> {
+  static async scrapeWebsite(url: string, useCache = true): Promise<ScrapingResult> {
     const startTime = Date.now();
-    const apiKey = this.getApiKey();
     
+    // Check cache first
+    if (useCache) {
+      const cached = this.getCachedResult(url);
+      if (cached) return cached;
+    }
+    
+    // Validate URL
+    const validation = await this.validateUrl(url);
+    if (!validation.isValid) {
+      return {
+        success: false,
+        error: `Invalid URL: ${validation.error}. Suggestions: ${validation.suggestions?.join(', ')}`
+      };
+    }
+    
+    const apiKey = this.getApiKey();
     if (!apiKey) {
       return { 
         success: false, 
@@ -165,10 +345,30 @@ export class FirecrawlService {
 
       let scrapeResponse: FirecrawlResponse;
 
-      if (urlAnalysis.isAffiliatePage) {
-        scrapeResponse = await this.scrapeAffiliatePage(url);
-      } else {
-        scrapeResponse = await this.scrapeRegularPage(url);
+      // Retry logic with exponential backoff
+      let lastError: Error | null = null;
+      for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
+        try {
+          if (urlAnalysis.isAffiliatePage) {
+            scrapeResponse = await this.scrapeAffiliatePage(url);
+          } else {
+            scrapeResponse = await this.scrapeRegularPage(url);
+          }
+          break; // Success, exit retry loop
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error('Unknown error');
+          console.warn(`Scraping attempt ${attempt} failed:`, lastError.message);
+          
+          if (attempt < this.config.maxRetries) {
+            const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      if (lastError) {
+        throw lastError;
       }
 
       if (!scrapeResponse.success) {
@@ -225,7 +425,7 @@ export class FirecrawlService {
 
       const processingTime = Date.now() - startTime;
 
-      return { 
+      const result = { 
         success: true,
         data: {
           raw: scrapeResponse.data,
@@ -237,7 +437,14 @@ export class FirecrawlService {
             extractionMethod: analyzed.extractionMethod
           }
         }
-      };
+      } as ScrapingResult;
+      
+      // Cache successful result
+      if (useCache) {
+        this.setCachedResult(url, result);
+      }
+      
+      return result;
 
     } catch (error) {
       console.error('Error during scraping:', error);
@@ -260,8 +467,8 @@ export class FirecrawlService {
         blockAds: false, // Don't block ads - might block content
         removeBase64Images: true,
         mobile: false,
-        waitFor: 10000, // Wait longer for JS to load
-        timeout: 30000, // Increase timeout
+        waitFor: this.config.affiliateWaitFor,
+        timeout: this.config.affiliateTimeout,
         skipTlsVerification: true, // Help with problematic SSL
         actions: [
           {
@@ -297,8 +504,8 @@ export class FirecrawlService {
       blockAds: true,
       removeBase64Images: true,
       mobile: false,
-      waitFor: 3000,
-      timeout: 15000,
+      waitFor: this.config.waitFor,
+      timeout: this.config.timeout,
       includeTags: [
         'title', 'meta', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'p', 'div', 'span', 'button', 'a', 'ul', 'li', 'section', 
@@ -911,21 +1118,6 @@ export class FirecrawlService {
   }
 
   // ==================== PUBLIC UTILITY METHODS ====================
-
-  static async validateUrl(url: string): Promise<{ isValid: boolean; error?: string }> {
-    try {
-      new URL(url);
-      
-      // Basic accessibility check
-      const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-      return { isValid: true };
-    } catch (error) {
-      return { 
-        isValid: false, 
-        error: 'Invalid URL format or URL is not accessible' 
-      };
-    }
-  }
 
   static getExtractionSummary(result: ScrapingResult): string {
     if (!result.success || !result.data) {
