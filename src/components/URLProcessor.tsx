@@ -134,8 +134,9 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
 
       // Step 3: Analyze content with AI
       setProgress(70);
+      console.log('About to analyze scraped content with ContentAnalyzer...');
       const productData: ProductData = await ContentAnalyzer.analyzeContent(scrapeResult.data);
-      
+      console.log('ContentAnalyzer completed, product data:', productData);
       // Add scraping metadata
       (productData as any).scrapingMetadata = {
         method: scrapeResult.method,
