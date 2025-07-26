@@ -135,32 +135,39 @@ export const URLProcessor = ({ onProcessingComplete }: URLProcessorProps) => {
       // Step 3: Analyze content with AI
       setProgress(70);
       console.log('About to analyze scraped content with ContentAnalyzer...');
-      const productData: ProductData = await ContentAnalyzer.analyzeContent(scrapeResult.data);
-      console.log('ContentAnalyzer completed, product data:', productData);
-      // Add scraping metadata
-      (productData as any).scrapingMetadata = {
-        method: scrapeResult.method,
-        qualityScore: scrapeResult.qualityScore,
-        processingTime: scrapeResult.processingTime,
-        cost: scrapeResult.cost
-      };
+      
+      try {
+        const productData: ProductData = await ContentAnalyzer.analyzeContent(scrapeResult.data);
+        console.log('ContentAnalyzer completed, product data:', productData);
+        
+        // Add scraping metadata
+        (productData as any).scrapingMetadata = {
+          method: scrapeResult.method,
+          qualityScore: scrapeResult.qualityScore,
+          processingTime: scrapeResult.processingTime,
+          cost: scrapeResult.cost
+        };
 
-      // Step 4: Complete
-      setProgress(100);
-      setValidation({
-        isValid: true,
-        isAccessible: true,
-        redirectedURL: `✅ Extracted using ${scrapeResult.method} (${Math.round((scrapeResult.qualityScore || 0) * 100)}% quality)`
-      });
-
-      setTimeout(() => {
-        console.log('About to call onProcessingComplete with data:', productData);
-        onProcessingComplete(productData);
-        toast({
-          title: "Analysis Complete",
-          description: `Extracted using ${scrapeResult.method} with ${Math.round((scrapeResult.qualityScore || 0) * 100)}% quality score`,
+        // Step 4: Complete
+        setProgress(100);
+        setValidation({
+          isValid: true,
+          isAccessible: true,
+          redirectedURL: `✅ Extracted using ${scrapeResult.method} (${Math.round((scrapeResult.qualityScore || 0) * 100)}% quality)`
         });
-      }, 500);
+
+        setTimeout(() => {
+          console.log('About to call onProcessingComplete with data:', productData);
+          onProcessingComplete(productData);
+          toast({
+            title: "Analysis Complete",
+            description: `Extracted using ${scrapeResult.method} with ${Math.round((scrapeResult.qualityScore || 0) * 100)}% quality score`,
+          });
+        }, 500);
+      } catch (contentAnalysisError) {
+        console.error('ContentAnalyzer failed:', contentAnalysisError);
+        throw new Error(`Content analysis failed: ${contentAnalysisError}`);
+      }
 
     } catch (error) {
       console.error('Error processing URL:', error);
