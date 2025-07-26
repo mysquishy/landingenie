@@ -205,15 +205,15 @@ Return only the guarantee text.`
 
       // Format final copy object
       const finalCopy: GeneratedCopy = {
-        headline: results.headline,
-        subheadline: results.subheadline, 
-        heroText: results.heroText,
-        benefits: results.benefits,
-        socialProof: results.socialProof,
-        cta: Array.isArray(results.cta) ? results.cta[0] : results.cta,
-        urgency: results.urgency,
-        objectionHandling: results.objectionHandling,
-        guarantee: results.guarantee
+        headline: results.headline || 'Generated Headline',
+        subheadline: results.subheadline || 'Generated Subheadline', 
+        heroText: results.heroText || 'Generated hero text',
+        benefits: Array.isArray(results.benefits) ? results.benefits : [results.benefits || 'Generated benefit'],
+        socialProof: results.socialProof || 'Generated social proof',
+        cta: Array.isArray(results.cta) ? results.cta[0] : results.cta || 'Get Started Now',
+        urgency: results.urgency || 'Limited time offer',
+        objectionHandling: Array.isArray(results.objectionHandling) ? results.objectionHandling : [results.objectionHandling || 'Objection handled'],
+        guarantee: results.guarantee || 'Money back guarantee'
       };
 
       setGeneratedCopy(finalCopy);
