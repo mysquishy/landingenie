@@ -212,37 +212,10 @@ export class FirecrawlService {
     console.log('Scraping affiliate page with enhanced configuration...');
     
     try {
-      // First attempt: LLM extraction with structured data
-      const llmResponse = await this.firecrawlApp!.scrapeUrl(url, {
-        formats: ['json', 'markdown'],
-        extract: {
-          prompt: `Extract marketing elements from this sales/affiliate page:
-
-REQUIRED DATA:
-- productName: Exact product name (not generic terms)
-- headlines: Main headlines and value propositions (array)
-- testimonials: Customer testimonials with quotes (array) 
-- pricing: Price information, offers, discounts (array)
-- benefits: Key benefits and features (array)
-- ctas: Call-to-action button text (array)
-- guarantees: Money-back guarantees, risk reversals (array)
-- timeframes: Delivery times, results timeframes (array)
-- socialProof: Customer counts, ratings, statistics (array)
-- targetAudience: Who this product is for
-- mainBenefit: Primary value proposition
-
-Return as JSON with these exact keys. If information is not found, use empty array [] or empty string "".`
-        },
-        waitFor: 8000,
-        onlyMainContent: true,
-        timeout: 25000
-      });
-
-      if (llmResponse.success) {
-        return llmResponse as any;
-      }
+      // Skip LLM extraction for now - focus on basic scraping
+      console.log('Attempting basic scraping due to API limitations...');
     } catch (error) {
-      console.warn('LLM extraction failed, trying fallback method:', error);
+      console.warn('LLM extraction skipped:', error);
     }
 
     // Fallback: Standard scraping with enhanced configuration
